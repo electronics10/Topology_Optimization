@@ -10,7 +10,7 @@ class MyController:
         self.myinterface.opencst()
 
     def set_environment(self,Lg, Wg, hc, hs): # initialize ground, substrate, feed, and port
-        self.myinterface.set_environment(Lg, Wg, hc, hs)
+        self.myinterface.set_my_environment(Lg, Wg, hc, hs)
         # self.myinterface.save()
 
     def set_domain(self, Ld, Wd, d, hc): # initialize domain with uniform conductivity

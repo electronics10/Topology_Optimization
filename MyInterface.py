@@ -136,7 +136,7 @@ class MyInterface:
         res = self.excute_vba(command)
         return res
     
-    def set_environment(self, Lg, Wg, hc, hs):
+    def set_my_environment(self, Lg, Wg, hc, hs):
         paraDict = {"Lg":Lg, "Wg":Wg, "hc":hc, "hs":hs}
         for parameter in paraDict:
             self.create_para(parameter, paraDict[parameter])
