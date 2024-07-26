@@ -8,6 +8,7 @@ class MyController:
     def __init__(self, fname): # Information of which project to open
         self.myinterface = MI.MyInterface(os.getcwd(), fname)
         self.myinterface.opencst()
+        self.geometry = None
 
     def set_environment(self,Lg, Wg, hc, hs): # initialize ground, substrate, feed, and port
         self.myinterface.set_my_environment(Lg, Wg, hc, hs)
