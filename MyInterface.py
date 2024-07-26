@@ -12,7 +12,6 @@ class MyInterface:
         self.de = None
         self.prj = None
 
-    
     def read(self, result_item):
         try:
             res = self.results.get_3d().get_result_item(result_item)
@@ -68,7 +67,7 @@ class MyInterface:
         # command = "\n".join(command)
         # self.prj.modeler.add_to_history(f"solid{index}",command)
     
-    def create_cond_material(self, index, sigma, type="Lossy metal"): #create or change are the same
+    def create_material(self, index, sigma, type="Lossy metal"): #create or change are the same
         command = ['With Material', '.Reset ', f'.Name "material{index}"', 
                 #    '.Folder ""', '.Rho "8930"', '.ThermalType "Normal"', 
                 #    '.ThermalConductivity "401"', '.SpecificHeat "390", "J/K/kg"', 
@@ -99,29 +98,6 @@ class MyInterface:
             model.run_solver()
         except Exception as e: pass
     
-    def set_monitor(self, Ld, Wd, d, hc):
-        margin = (Ld - d)/2
-        EonPatch = ['With Monitor ', '.Reset ', '.Name "E_field_on_patch" ', 
-                   '.Dimension "Volume" ', '.Domain "Time" ', '.FieldType "Efield" ', 
-                   '.Tstart "0" ', '.Tstep "0.1" ', '.Tend "3.5" ', '.UseTend "True" ', 
-                   '.UseSubvolume "True" ', '.Coordinates "Free" ', 
-                   f'.SetSubvolume "0", "0", "0", "0", "-6.635", "{hc}" ', 
-                   f'.SetSubvolumeOffset "{margin}", "{margin}", "{margin}", "{margin}", "{margin}", "{margin}" ', 
-                   '.SetSubvolumeInflateWithOffset "True" ', '.PlaneNormal "z" ', 
-                   f'.PlanePosition "{hc}" ', '.Create ', 'End With']
-        PonFeed = ['With Monitor ', 
-                   '.Reset ', '.Name "power_on_feed" ', '.Dimension "Volume" ', 
-                   '.Domain "Time" ', '.FieldType "Powerflow" ', 
-                   '.Tstart "0" ', '.Tstep "0.1" ', '.Tend "3.5" ', 
-                   '.UseTend "True" ', '.UseSubvolume "True" ', '.Coordinates "Free" ', 
-                   '.SetSubvolume "3.4", "6.6", "-1.5", "0.5", "-6.635", "0.035" ', 
-                   '.SetSubvolumeOffset "0.0", "0.0", "0.0", "0.0", "0.0", "0.0" ', 
-                   '.SetSubvolumeInflateWithOffset "True" ', '.PlaneNormal "z" ', 
-                   '.PlanePosition "0.035" ', '.Create ', 'End With']
-        command = EonPatch + PonFeed
-        command = "\n".join(command)
-        self.prj.modeler.add_to_history("set monitor",command)
-    
     def set_plane_wave(self):  # doesn't update history, disappear after save but remain after simulation
         command = ['Sub Main', 'With PlaneWave', '.Reset ', 
                    '.Normal "0", "0", "-1" ', '.EVector "1", "0", "0" ', 
@@ -129,6 +105,11 @@ class MyInterface:
                    '.PhaseDifference "-90.0" ', '.CircularDirection "Left" ', 
                    '.AxialRatio "0.0" ', '.SetUserDecouplingPlane "False" ', 
                    '.Store', 'End With', 'End Sub']
+        res = self.excute_vba(command)
+        return res
+    
+    def delete_plane_wave(self):
+        command = ['Sub Main', 'PlaneWave.Delete', 'End Sub']
         res = self.excute_vba(command)
         return res
     
@@ -143,56 +124,9 @@ class MyInterface:
         res = self.excute_vba(command)
         return res
     
-    def delete_plane_wave(self):
-        command = ['Sub Main', 'PlaneWave.Delete', 'End Sub']
-        res = self.excute_vba(command)
-        return res
-    
-    def delete_signal1(self):
+    def delete_excitation(self):
         command = ['Sub Main', 'With TimeSignal', 
      '.Delete "signal1", "High Frequency" ', 'End With', 'End Sub']
-        res = self.excute_vba(command)
-        return res
-    
-    def set_port(self):
-        command = ['Sub Main', 'Pick.PickEdgeFromId "component1:feed", "1", "1"', 
-                   'Pick.PickEdgeFromId "component1:coaxouter", "1", "1"', 
-                   'With DiscreteFacePort ', '.Reset ', '.PortNumber "1" ', 
-                   '.Type "SParameter"', '.Label ""', '.Folder ""', '.Impedance "50.0"', 
-                   '.VoltageAmplitude "1.0"', '.CurrentAmplitude "1.0"', '.Monitor "True"', 
-                   '.CenterEdge "True"', '.SetP1 "True", "5.7", "-0.5", "-6.635"', 
-                   '.SetP2 "True", "6.6", "-0.5", "-6.635"', '.LocalCoordinates "False"', 
-                   '.InvertDirection "False"', '.UseProjection "False"', 
-                   '.ReverseProjection "False"', '.FaceType "Linear"', '.Create ', 
-                   'End With', 'End Sub']
-        res = self.excute_vba(command)
-        return res
-    
-    def delete_port(self):
-        command = ['Sub Main', 'Port.Delete "1"', 'End Sub']
-        res = self.excute_vba(command)
-        return res
-    
-    def export_E_field(self, outputPath, resultPath):
-        step = 3 # grid width=3mm: one sample each grid
-        command = ['Sub Main',
-        'SelectTreeItem  ("%s")' % resultPath, 
-        'With ASCIIExport', '.Reset',
-        f'.FileName ("{outputPath}")',
-        '.SetSampleRange(0, 35)',
-        '.Mode ("FixedWidth")', '.Step (%s)' % step,
-        '.Execute', 'End With', 'End Sub']
-        res = self.excute_vba(command)
-        return res
-    
-    def export_power(self, outputPath, resultPath):
-        command = ['Sub Main',
-        'SelectTreeItem  ("%s")' % resultPath, 
-        'With ASCIIExport', '.Reset',
-        f'.FileName ("{outputPath}")',
-        '.SetSampleRange(0, 35)',
-        '.StepX (4)', '.StepY (4)',
-        '.Execute', 'End With', 'End Sub']
         res = self.excute_vba(command)
         return res
     
@@ -202,7 +136,7 @@ class MyInterface:
         res = self.excute_vba(command)
         return res
     
-    def initialize(self, Lg, Wg, hc, hs):
+    def set_environment(self, Lg, Wg, hc, hs):
         paraDict = {"Lg":Lg, "Wg":Wg, "hc":hc, "hs":hs}
         for parameter in paraDict:
             self.create_para(parameter, paraDict[parameter])
@@ -255,6 +189,72 @@ class MyInterface:
         command = "\n".join(command)
         res = self.prj.modeler.add_to_history("initialize",command)
         return res
+    
+    def set_monitor(self, Ld, Wd, d, hc):
+        margin = (Ld - d)/2
+        EonPatch = ['With Monitor ', '.Reset ', '.Name "E_field_on_patch" ', 
+                   '.Dimension "Volume" ', '.Domain "Time" ', '.FieldType "Efield" ', 
+                   '.Tstart "0" ', '.Tstep "0.1" ', '.Tend "3.5" ', '.UseTend "True" ', 
+                   '.UseSubvolume "True" ', '.Coordinates "Free" ', 
+                   f'.SetSubvolume "0", "0", "0", "0", "-6.635", "{hc}" ', 
+                   f'.SetSubvolumeOffset "{margin}", "{margin}", "{margin}", "{margin}", "{margin}", "{margin}" ', 
+                   '.SetSubvolumeInflateWithOffset "True" ', '.PlaneNormal "z" ', 
+                   f'.PlanePosition "{hc}" ', '.Create ', 'End With']
+        PonFeed = ['With Monitor ', 
+                   '.Reset ', '.Name "power_on_feed" ', '.Dimension "Volume" ', 
+                   '.Domain "Time" ', '.FieldType "Powerflow" ', 
+                   '.Tstart "0" ', '.Tstep "0.1" ', '.Tend "3.5" ', 
+                   '.UseTend "True" ', '.UseSubvolume "True" ', '.Coordinates "Free" ', 
+                   '.SetSubvolume "3.4", "6.6", "-1.5", "0.5", "-6.635", "0.035" ', 
+                   '.SetSubvolumeOffset "0.0", "0.0", "0.0", "0.0", "0.0", "0.0" ', 
+                   '.SetSubvolumeInflateWithOffset "True" ', '.PlaneNormal "z" ', 
+                   '.PlanePosition "0.035" ', '.Create ', 'End With']
+        command = EonPatch + PonFeed
+        command = "\n".join(command)
+        self.prj.modeler.add_to_history("set monitor",command)
+    
+    def set_port(self):
+        command = ['Sub Main', 'Pick.PickEdgeFromId "component1:feed", "1", "1"', 
+                   'Pick.PickEdgeFromId "component1:coaxouter", "1", "1"', 
+                   'With DiscreteFacePort ', '.Reset ', '.PortNumber "1" ', 
+                   '.Type "SParameter"', '.Label ""', '.Folder ""', '.Impedance "50.0"', 
+                   '.VoltageAmplitude "1.0"', '.CurrentAmplitude "1.0"', '.Monitor "True"', 
+                   '.CenterEdge "True"', '.SetP1 "True", "5.7", "-0.5", "-6.635"', 
+                   '.SetP2 "True", "6.6", "-0.5", "-6.635"', '.LocalCoordinates "False"', 
+                   '.InvertDirection "False"', '.UseProjection "False"', 
+                   '.ReverseProjection "False"', '.FaceType "Linear"', '.Create ', 
+                   'End With', 'End Sub']
+        res = self.excute_vba(command)
+        return res
+    
+    def delete_port(self):
+        command = ['Sub Main', 'Port.Delete "1"', 'End Sub']
+        res = self.excute_vba(command)
+        return res
+    
+    def export_E_field(self, outputPath, resultPath):
+        step = 3 # grid width=3mm: one sample each grid
+        command = ['Sub Main',
+        'SelectTreeItem  ("%s")' % resultPath, 
+        'With ASCIIExport', '.Reset',
+        f'.FileName ("{outputPath}")',
+        '.SetSampleRange(0, 35)',
+        '.Mode ("FixedWidth")', '.Step (%s)' % step,
+        '.Execute', 'End With', 'End Sub']
+        res = self.excute_vba(command)
+        return res
+    
+    def export_power(self, outputPath, resultPath):
+        command = ['Sub Main',
+        'SelectTreeItem  ("%s")' % resultPath, 
+        'With ASCIIExport', '.Reset',
+        f'.FileName ("{outputPath}")',
+        '.SetSampleRange(0, 35)',
+        '.StepX (4)', '.StepY (4)',
+        '.Execute', 'End With', 'End Sub']
+        res = self.excute_vba(command)
+        return res
+    
     
     # def export_3D_datas(self,  flag, start_frequency, end_frequency, step, file_path, mode): 
     #     if (mode == 'E'):

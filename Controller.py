@@ -10,7 +10,7 @@ class MyController:
         self.myinterface.opencst()
 
     def set_environment(self,Lg, Wg, hc, hs): # initialize ground, substrate, feed, and port
-        self.myinterface.initialize(Lg, Wg, hc, hs)
+        self.myinterface.set_environment(Lg, Wg, hc, hs)
         # self.myinterface.save()
 
     def set_domain(self, Ld, Wd, d, hc): # initialize domain with uniform conductivity
@@ -20,7 +20,7 @@ class MyController:
         command = []
         for index, sigma in enumerate(cond): 
             # self.myinterface.create_para(f"c{index}", sigma)
-            # self.myinterface.create_cond_material(index)
+            # self.myinterface.create_material(index)
             # Down left to upright, better since it's the order CST export
             midpoint = (Ld/2, Wd/2)
             xi = index%nx
@@ -45,8 +45,8 @@ class MyController:
         for index, sigma in enumerate(cond):
             # command.append(f'StoreDoubleParameter("c{index}", "{sigma}")')
             # Change material type for dielectric otherwise solver error
-            if sigma < 9000: command_material += self.myinterface.create_cond_material(index, sigma, "Normal")
-            else: command_material += self.myinterface.create_cond_material(index, sigma)
+            if sigma < 9000: command_material += self.myinterface.create_material(index, sigma, "Normal")
+            else: command_material += self.myinterface.create_material(index, sigma)
         # command.append('RebuildOnParametricChange(False, True)')
         # command.append('End Sub')
         # self.myinterface.excute_vba(command)
@@ -70,7 +70,7 @@ class MyController:
         self.myinterface.export_E_field(outputPath, "2D/3D Results\\E-Field\\E_field_on_patch [1]")
         print(f"fe: electric field exported as '{outputName}'")
         self.myinterface.delete_results()
-        self.myinterface.delete_signal1()
+        self.myinterface.delete_excitation()
         self.myinterface.delete_port()
 
     def plane_wave_excitation(self, outputName="E_received.txt"):
