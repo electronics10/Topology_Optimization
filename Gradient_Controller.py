@@ -1,5 +1,5 @@
 import os
-import MyInterface as MI
+import Interface as MI
 import numpy as np
 import matplotlib.pyplot as plt
 
