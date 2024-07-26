@@ -56,7 +56,7 @@ class MyInterface:
     def create_para(self,  para_name, para_value): #create or change are the same
         command = ['Sub Main', 'StoreDoubleParameter("%s", "%.4f")' % (para_name, para_value),
                 'RebuildOnParametricChange(False, True)', 'End Sub']
-        res = self.excute_vba (command)
+        # res = self.excute_vba (command)
         return command
     
     def create_shape(self, index, xmin, xmax, ymin, ymax, hc): #create or change are the same
