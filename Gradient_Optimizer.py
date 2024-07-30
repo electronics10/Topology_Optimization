@@ -10,7 +10,7 @@ nx, ny = (int(Ld//d), int(Wd//d))
 
 def call_controller(file, set_domain=False):
     # Initialize antenna
-    mycontroller = cc.MyController(file)
+    mycontroller = cc.Gradient_Controller(file)
     if set_domain:
         print("Setting domain, environment, and monitor")
         mycontroller.set_domain(Ld, Wd, d, hc)

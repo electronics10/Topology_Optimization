@@ -4,9 +4,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-class MyController:
+class Gradient_Controller:
     def __init__(self, fname): # Information of which project to open
-        self.myinterface = MI.MyInterface(os.getcwd(), fname)
+        self.myinterface = MI.CST_interface(os.getcwd(), fname)
         self.myinterface.opencst()
         self.geometry = None
 

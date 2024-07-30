@@ -5,7 +5,7 @@ import cst.results as cstr
 import cst.interface as csti
 
 
-class MyInterface:
+class CST_interface:
     def __init__(self,folder_path, fname):
         self.full_path = f'{folder_path}\\{fname}'
         self.results = cstr.ProjectFile(self.full_path, True) #bool: allow interactive
