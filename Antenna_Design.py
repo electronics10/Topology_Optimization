@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 from PIL import Image, ImageDraw, ImageFont
 from math import ceil, sqrt
+import csv
 import Controller as cc
 
 
@@ -60,12 +61,15 @@ def add_noise(binary_array, dB=0):
 # Optimizer Class
 class Optimizer:
     def __init__(self, call_controller=True):
+        # Operating domain
         self.Ld = L
         self.Wd = W
         self.d = D
         self.nx = int(self.Ld//self.d)
         self.ny = int(self.Wd//self.d)
-        self.excitePath = "txtf\\spec.txt"
+        # Specification
+        self.specification()
+        # Others
         if call_controller:
             self.receiver = cc.Controller("CST_Antennas/receiver.cst")
             self.transmitter = cc.Controller("CST_Antennas/transmitter.cst")
@@ -80,7 +84,7 @@ class Optimizer:
         print("Setting environment for receiver...")
         self.receiver.set_base()
         self.receiver.set_domain(self.Ld, self.Wd, self.d)
-        self.receiver.set_monitor(self.Ld, self.d)
+        self.receiver.set_monitor(self.Ld, self.d, self.time_step)
         print("Receiver environment set")
         # Set base, domain, and monitor for transmitter
         print("Setting environment for transmitter...")
@@ -89,11 +93,13 @@ class Optimizer:
         self.transmitter.set_monitor(self.Ld, self.d)
         print("transmitter environment set")
 
-    def specification(self, freq):
-        self.excitePath = None
-        pass
+    def specification(self, freq_min=1, freq_max=3, excitePath=None):
+        if excitePath: self.excitePath = excitePath
+        else: 
+            self.excitePath = None
+            self.time_step = 0.1 # 0.1 nano second
 
-    def gradient_descent(self, unit_cond, alpha=0.5, gamma=0.9, linear_map=True):
+    def gradient_descent(self, unit_cond, alpha=0.5, gamma=0.9, linear_map=False):
         self.clean_results() # clean legacy, otherwise troublesome when plot
         print("Executing gradient ascent:\n")
         '''
@@ -106,6 +112,8 @@ class Optimizer:
         iterations = 200 # maximum iterations if not converging
         radius = self.nx/2/4 # radius for gaussian filter
         last_step = np.zeros(self.nx*self.ny) # Initial step of descent
+        adam_var = np.array([np.zeros(self.nx*self.ny), np.zeros(self.nx*self.ny),\
+            np.zeros(self.nx*self.ny), np.zeros(self.nx*self.ny)]) # Initialize variables in Adam algorithm: [m, v, m_hat, v_hat]
         # Gradient ascent loop
         start_time = time.time()
         for index in range(iterations):
@@ -115,11 +123,9 @@ class Optimizer:
             unit_cond_smoothed = scimage.gaussian_filter(unit_cond, radius) # Apply Gaussian filter
             # map unit to full
             if linear_map: cond = unit_cond_smoothed*5.8e7
-            else: cond = 10**(9*unit_cond_smoothed - 4)
+            else: cond = 10**(9*unit_cond_smoothed - 4) # original mapping from paper
             # calculate gradient by adjoint method
             grad_cond = self.calculate_gradient(cond)
-            rms_grad_cond = np.sqrt(np.mean(grad_cond**2)) # Calculate rms to see overall trend
-            print(f"rms_grad = {rms_grad_cond}\n")
 
             # # Record ---------------------------------
             # Record conductivity (smoothed)
@@ -134,7 +140,7 @@ class Optimizer:
             file.close()
             # Record grad_cond
             file = open(self.results_history_path['grad_cond'], "a")
-            file.write(f"Iteration{index}, rms={rms_grad_cond}\n")
+            file.write(f"Iteration{index}, rms={np.sqrt(np.mean(grad_cond**2))}\n")
             file.write(f"{grad_cond}\n")
             file.close() 
             # -------------------------------------------
@@ -147,10 +153,12 @@ class Optimizer:
             grad_uc = scimage.gaussian_filter(grad_uc, radius) # second chain (derivatives of kernel)
             step = grad_uc
             # Apply Adam algorithm
-            step = self.Adam(step, index)
+            step, adam_var = self.Adam(step, index, adam_var)
             # update conductivity distribution
             unit_cond = unit_cond + alpha * step
 
+            # Print rms to see overall trend
+            print(f"rms_step = {np.sqrt(np.mean(step**2))}\n")
             # # Discriminant
             if np.dot(last_step, step) < 0: 
                 discriminant += 1
@@ -158,8 +166,9 @@ class Optimizer:
                 if discriminant >= 2: # oscillating around extremum
                     print("Local extremum detected, optimization process done")
                     break
-            elif np.square(np.mean((step + last_step)**2)) < 0.001: # two consecutive tiny step, plateau case
-                print("Local extremum detected, optimization process done")
+            elif np.sqrt(np.mean(step**2)) < 0.1: # Adam is not likely to oscillate
+                discriminant += 1
+                print("Step < 0.1, optimization process done")
                 break
             # update radius to make next descent finer
             radius *= gamma
@@ -169,7 +178,7 @@ class Optimizer:
         # Set converge (last update) for transmitter to read S11
         grad_cond = self.calculate_gradient(cond)
         end_time = time.time()
-        print(f"{index+2} iterations in total, take time {start_time-end_time}")
+        print(f"{index+2} iterations in total, take time {end_time-start_time}")
 
     def calculate_gradient(self, cond):
         print("Calculating gradient...")
@@ -196,26 +205,36 @@ class Optimizer:
         print("Executing time reversal...")
         # Read power file and make power list
         file = open(powerPath,'r')
-        power = []
-        t = 0
+        power_array = []
+        total_power = 0 # record total power
+        t = 0.0
         for line in file.readlines()[2:]: # First two lines are titles
             if line.startswith('Sample'): pass
             else:
                 line = line.split() # x,y,z,Px,Py,Pz
-                P_abs_square = 0
                 time = []
-                # for word in line[3:]:
-                #     word = float(word)
-                #     P_abs_square += word**2
                 time.append(t)
-                # time.append(P_abs_square**(1/2))
-                time.append(float(line[3]))
-                power.append(time)
-                t += 0.1
+                poynting_x = float(line[3])
+                time.append(poynting_x)
+                power_array.append(time)
+                t += self.time_step
+                total_power += np.abs(poynting_x)
         file.close()
+        '''-------------------------------------------------
+        Record received power while doing power_time_reverse for calculating gradient,
+        otherwise lose the information since we don't have exact objective function.
+        '''
+        with open('results\\total_power.csv', 'a', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow([total_power])
+        '''
+        Didn't normalize since it's hard to tell the unit. 
+        Should not be compared with different experiments.
+        -----------------------------------------------------
+        '''
         # Time reverse
-        power = np.array(power)
-        feed = np.array([power.T[0], np.flip(power.T[1], 0)])
+        power_array = np.array(power_array)
+        feed = np.array([power_array.T[0], np.flip(power_array.T[1], 0)])
         feed = feed.T
         # Write reversed power
         feedPath = "txtf\\reversed_power.txt"
@@ -225,13 +244,6 @@ class Optimizer:
             file.write(f"{pair[0]} {pair[1]}\n")
         file.close()
         print(f"reversed power exported as '{feedPath}'")
-        if plot: # for debug
-            plt.figure(1)
-            plt.plot(power.T[0], power.T[1])
-            plt.figure(2)
-            plt.plot(feed.T[0], feed.T[1])
-            plt.show()
-        print(f"Return {feedPath}")
         return feedPath
     
     def Efile2gridE(self, path):
@@ -245,7 +257,6 @@ class Optimizer:
                 for word in line[:2:-1]: # Ez, Ey, Ex (because I want final word = Ex)
                     word = float(word)
                     E_abs_square += word**2
-                # time.append(E_abs_square**(1/2))
                 time.append(E_abs_square**(1/2)*np.sign(word))
             else:
                 grid_E.append(time)
@@ -255,33 +266,36 @@ class Optimizer:
         grid_E = np.array(grid_E) # [t0, t1, ...tk=[|E_1|,...|E_k|...,|E_169|],...t35]
         return grid_E
 
-    def Adam(self, gradient, iteration):
-        m = np.zeros(self.nx*self.ny)  # First moment
-        v = np.zeros(self.nx*self.ny)  # Second moment
+    def Adam(self, gradient, iteration, adam_var):
         beta1 = 0.9  # Decay rate for first moment
         beta2 = 0.999  # Decay rate for second moment
         epsilon = 1e-8  # Small value to prevent division by zero
         # Update biased first moment estimate
-        m = beta1 * m + (1 - beta1) * gradient
+        adam_var[0] = beta1 * adam_var[0] + (1 - beta1) * gradient
         # Update biased second moment estimate
-        v = beta2 * v + (1 - beta2) * (gradient ** 2)
+        adam_var[1] = beta2 * adam_var[1] + (1 - beta2) * (gradient ** 2)
         # Compute bias-corrected first and second moment estimates
-        m_hat = m / (1 - beta1 ** iteration + epsilon)
-        v_hat = v / (1 - beta2 ** iteration + epsilon)
-        step = m_hat / (v_hat ** 0.5 + epsilon)
+        adam_var[2] = adam_var[0] / (1 - beta1 ** iteration + epsilon)
+        adam_var[3] = adam_var[1] / (1 - beta2 ** iteration + epsilon)
+        step = adam_var[2] / (adam_var[3] ** 0.5 + epsilon)
         # Record Adam parameters
         file = open("results\\Adam.txt", "a")
         file.write(f"Iteration{iteration}\n")
-        file.write(f"m={m}\nv={v}\nm_hat={m_hat}\nv_hat={v_hat}\nstep={step}\n")
+        file.write(f"m={adam_var[0]}\nv={adam_var[1]}\nm_hat={adam_var[2]}\nv_hat={adam_var[3]}\nstep={step}\n")
         file.close()
         # return step
-        return step
+        return step, adam_var
 
     def clean_results(self):
         print("Cleaning results...")
         for result_path in self.results_history_path.values():
             if os.path.exists(result_path): os.remove(result_path)
         # Clean Adam.txt
+        if os.path.exists("results\\Adam.txt"): os.remove("results\\Adam.txt")
+        # Clean total_power.csv
+        if os.path.exists("results\\total_power.csv"): os.remove("results\\total_power.csv")
+        # Clean s11.csv (Not good, optimizer shouldn't know the path of s11. but anyway)
+        if os.path.exists("results\\s11.csv"): os.remove("results\\s11.csv")
         print("All files deleted successfully.")
 
     # Plotting function--------------------
@@ -351,12 +365,13 @@ if __name__ == "__main__":
     # Optimize any given antenna
     optimizer = Optimizer()
     optimizer.specification(2.4) # Fake, working on it
-    unit_initial_antenna = add_noise(generate_shape(shape='alphabet', letter='G').ravel(), dB=0)
+    unit_initial_antenna = add_noise(generate_shape(shape='alphabet', letter='A').ravel(), dB=0)
     optimizer.gradient_descent(unit_initial_antenna)
 
     # # Plot distribution of results
     # optimizer = Optimizer(call_controller=False)
     # for path in optimizer.results_history_path.values():
-    #     for index in range(3):
-    #         optimizer.plot_distribution(path, true_position=False, start=index/3, end=(index+1)/3)
+    #     batch = 3
+    #     for index in range(batch):
+    #         optimizer.plot_distribution(path, true_position=True, start=index/batch, end=(index+1)/batch)
     #         plt.show()
