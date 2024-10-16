@@ -74,9 +74,9 @@ class Optimizer:
             self.receiver = cc.Controller("CST_Antennas/receiver.cst")
             self.transmitter = cc.Controller("CST_Antennas/transmitter.cst")
         self.results_history_path = {
-            'cond':"results\\cond_history.txt", 
-            'unit_cond':"results\\unit_cond_history.txt",
-            'grad_cond':"results\\grad_history.txt",
+            'cond':"results\\cond_smoothed_history.txt", 
+            'primal':"results\\primal_history.txt",
+            'grad_CST':"results\\grad_CST_history.txt",
             }
     
     def set_environment(self):
@@ -99,7 +99,7 @@ class Optimizer:
             self.excitePath = None
             self.time_step = 0.1 # 0.1 nano second
 
-    def gradient_descent(self, unit_cond, alpha=0.5, gamma=0.9, linear_map=False):
+    def gradient_descent(self, primal, alpha=0.5, gamma=0.9, linear_map=False):
         self.clean_results() # clean legacy, otherwise troublesome when plot
         print("Executing gradient ascent:\n")
         '''
@@ -114,48 +114,60 @@ class Optimizer:
         last_step = np.zeros(self.nx*self.ny) # Initial step of descent
         adam_var = np.array([np.zeros(self.nx*self.ny), np.zeros(self.nx*self.ny),\
             np.zeros(self.nx*self.ny), np.zeros(self.nx*self.ny)]) # Initialize variables in Adam algorithm: [m, v, m_hat, v_hat]
+        ones = np.ones(self.nx*self.ny)
         # Gradient ascent loop
         start_time = time.time()
         for index in range(iterations):
             print(f"Iteration{index}:")
             # # Map and calculate gradient
-            unit_cond = np.clip(unit_cond, 0, 1) # restrict unit_cond to [0,1] in case of out of bound
-            unit_cond_smoothed = scimage.gaussian_filter(unit_cond, radius) # Apply Gaussian filter
             # map unit to full
-            if linear_map: cond = unit_cond_smoothed*5.8e7
-            else: cond = 10**(9*unit_cond_smoothed - 4) # original mapping from paper
+            if linear_map: cond = np.clip(primal, 0, 1)*5.8e7
+            # else: cond = 10**(np.clip(primal, 0, 1) - 4) # original mapping from paper
+            else: 
+                if index == 0: 
+                    cond = primal*5.8e7 # linear
+                    primal = -np.log(1/primal - ones) # since default generation is binary
+                else:
+                    exp_neg_primal = np.exp(-primal)
+                    cond = 1/(ones + exp_neg_primal)*5.8e7 # 5.8e7*sigmoid(primal)
+            # apply Gaussian filter
+            cond_smoothed = scimage.gaussian_filter(cond, radius)
             # calculate gradient by adjoint method
-            grad_cond = self.calculate_gradient(cond)
+            grad_CST = self.calculate_gradient(cond_smoothed)
 
             # # Record ---------------------------------
             # Record conductivity (smoothed)
             file = open(self.results_history_path['cond'], "a")
             file.write(f"Iteration{index}, filter_radius={radius}\n")
-            file.write(f"{cond}\n")
+            file.write(f"{cond_smoothed}\n")
             file.close()
-            # Record unit_cond
-            file = open(self.results_history_path['unit_cond'], "a")
+            # Record primal
+            file = open(self.results_history_path['primal'], "a")
             file.write(f"Iteration{index}\n")
-            file.write(f"{unit_cond}\n")
+            file.write(f"{primal}\n")
             file.close()
-            # Record grad_cond
-            file = open(self.results_history_path['grad_cond'], "a")
-            file.write(f"Iteration{index}, rms={np.sqrt(np.mean(grad_cond**2))}\n")
-            file.write(f"{grad_cond}\n")
+            # Record grad_CST
+            file = open(self.results_history_path['grad_CST'], "a")
+            file.write(f"Iteration{index}, rms={np.sqrt(np.mean(grad_CST**2))}\n")
+            file.write(f"{grad_CST}\n")
             file.close() 
             # -------------------------------------------
 
             # # Do gradient descent
-            # calculate unit_cond gradient by chain rule
-            if linear_map: cond_by_ucs = unit_cond_smoothed/5.8e7 # linear case
-            else: cond_by_ucs = 9 * np.log(10) * 10**(9 * unit_cond_smoothed - 4) # nonlinear case
-            grad_uc = grad_cond * cond_by_ucs # first chain
-            grad_uc = scimage.gaussian_filter(grad_uc, radius) # second chain (derivatives of kernel)
-            step = grad_uc
+            # calculate primal gradient by chain rule
+            # first chain (derivatives of kernel)
+            grad_cond = scimage.gaussian_filter(grad_CST, radius)
+            # second chain
+            if linear_map: cond_by_primal = ones*5.8e7 # linear case
+            # else: cond_by_primal = 9 * np.log(10) * 10**(9 * primal - 4) # original chain from paper
+            else: cond_by_primal = exp_neg_primal/(ones + exp_neg_primal)**2
+            # overall
+            grad_primal = grad_cond * cond_by_primal
+            step = grad_primal
             # Apply Adam algorithm
             step, adam_var = self.Adam(step, index, adam_var)
             # update conductivity distribution
-            unit_cond = unit_cond + alpha * step
+            primal = primal + alpha * step
 
             # Print rms to see overall trend
             print(f"rms_step = {np.sqrt(np.mean(step**2))}\n")
@@ -176,7 +188,7 @@ class Optimizer:
             last_step = step
         if discriminant == 0: print(f"Problem unsolvable in {index+1} iterations")
         # Set converge (last update) for transmitter to read S11
-        grad_cond = self.calculate_gradient(cond)
+        grad_CST = self.calculate_gradient(cond_smoothed)
         end_time = time.time()
         print(f"{index+2} iterations in total, take time {end_time-start_time}")
 
@@ -366,7 +378,7 @@ if __name__ == "__main__":
     optimizer = Optimizer()
     optimizer.specification(2.4) # Fake, working on it
     unit_initial_antenna = add_noise(generate_shape(shape='alphabet', letter='A').ravel(), dB=0)
-    optimizer.gradient_descent(unit_initial_antenna)
+    optimizer.gradient_descent(unit_initial_antenna, linear_map=True)
 
     # # Plot distribution of results
     # optimizer = Optimizer(call_controller=False)
