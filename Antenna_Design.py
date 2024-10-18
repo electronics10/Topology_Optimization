@@ -1,61 +1,20 @@
 import os
 import time
-import numpy as np
-import scipy.ndimage as scimage
-import matplotlib.pyplot as plt
-import matplotlib.colors as colors
-from PIL import Image, ImageDraw, ImageFont
-from math import ceil, sqrt
 import csv
 import Controller as cc
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.colors as colors
+import scipy.ndimage as scimage
+from scipy.fft import fft, fftfreq
+from PIL import Image, ImageDraw, ImageFont
+from math import ceil, sqrt
 
 
 # Design parameter
 L = 42
 W = 42
 D = 6
-# Some interesting initial shape generator
-def generate_shape(n=int(L//D), shape='circle', **kwargs):
-    array = np.zeros((n, n), dtype=np.int32)
-    if shape == 'circle':
-        radius = kwargs.get('radius', n//3)
-        center = kwargs.get('center', (n // 2, n // 2))
-        y, x = np.ogrid[:n, :n]
-        dist_from_center = np.sqrt((x - center[0])**2 + (y - center[1])**2)
-        array[dist_from_center <= radius] = 1
-    elif shape == 'alphabet':
-        letter = kwargs.get('letter', 'F')
-        font_size = kwargs.get('font_size', 8)
-        array = generate_alphabet(letter, n, font_size)
-    return array
-
-def generate_alphabet(letter, n, font_size):
-    # Create a blank image with a white background
-    img = Image.new('L', (n, n), 0)  # 'L' mode for grayscale, initialized with black (0)
-    draw = ImageDraw.Draw(img)
-    # Load a default font
-    try:
-        font = ImageFont.truetype("arial.ttf", font_size)  # You can replace this with any valid font path
-    except:
-        font = ImageFont.load_default()
-    # Get the bounding box of the letter
-    bbox = draw.textbbox((0, 0), letter, font=font)
-    text_width, text_height = bbox[2] - bbox[0], bbox[3] - bbox[1]
-    # Calculate the position to center the letter
-    position = (n // 2 - text_width//1.8  , n // 2 - text_height//1.2)
-    # Draw the letter on the image
-    draw.text(position, letter, fill=1, font=font)
-    # Convert the image to a NumPy array (1 for white, 0 for black)
-    array = np.array(img)
-    return array
-
-def add_noise(binary_array, dB=0):
-    length = len(binary_array)
-    noise1 = np.random.rand(length)*0.00001*10**dB # 0.00001 because 5.8e7 scale is too large
-    noise2 = np.random.rand(length)*0.00001*10**dB # 0.00001 because 5.8e7 scale is too large
-    binary_array = binary_array + noise1 - noise2
-    binary_array = np.clip(binary_array, 0, 1)
-    return binary_array
 
 
 # Optimizer Class
@@ -68,23 +27,26 @@ class Optimizer:
         self.nx = int(self.Ld//self.d)
         self.ny = int(self.Wd//self.d)
         # Specification
-        self.specification()
+        self.time_step = 0.1 # default 0.1 ns for 1~3 GHz
+        self.time_end = 3.5 # default duration=3.5 ns for 1~3 GHz
+        self.excitePath = None # use CST default excitation for 1~3 GHz
         # Others
-        if call_controller:
+        if call_controller: # no need to controller for plotting
             self.receiver = cc.Controller("CST_Antennas/receiver.cst")
             self.transmitter = cc.Controller("CST_Antennas/transmitter.cst")
         self.results_history_path = {
             'cond':"results\\cond_smoothed_history.txt", 
             'primal':"results\\primal_history.txt",
             'grad_CST':"results\\grad_CST_history.txt",
+            'step':"results\\step_history.txt"
             }
-    
+
     def set_environment(self):
         # Set base, domain, and monitor for receiver
         print("Setting environment for receiver...")
         self.receiver.set_base()
         self.receiver.set_domain(self.Ld, self.Wd, self.d)
-        self.receiver.set_monitor(self.Ld, self.d, self.time_step)
+        self.receiver.set_monitor(self.Ld, self.d, self.time_step, self.time_end)
         print("Receiver environment set")
         # Set base, domain, and monitor for transmitter
         print("Setting environment for transmitter...")
@@ -93,12 +55,7 @@ class Optimizer:
         self.transmitter.set_monitor(self.Ld, self.d)
         print("transmitter environment set")
 
-    def specification(self, freq_min=1, freq_max=3, excitePath=None):
-        if excitePath: self.excitePath = excitePath
-        else: 
-            self.excitePath = None
-            self.time_step = 0.1 # 0.1 nano second
-
+    # Optimization core---------------------------------------------------------------------------------
     def gradient_descent(self, primal, alpha=0.5, gamma=0.9, linear_map=False):
         self.clean_results() # clean legacy, otherwise troublesome when plot
         print("Executing gradient ascent:\n")
@@ -109,8 +66,8 @@ class Optimizer:
         3. linear_map means linear or nonlinear conductivity mapping from [0,1] to actual conductivity
         '''
         discriminant = 0 # convergence detector
-        iterations = 200 # maximum iterations if not converging
-        radius = self.nx/2/4 # radius for gaussian filter
+        iterations = 200 # maximum iterations if doesn't converge
+        radius = self.nx/4 # radius for gaussian filter
         last_step = np.zeros(self.nx*self.ny) # Initial step of descent
         adam_var = np.array([np.zeros(self.nx*self.ny), np.zeros(self.nx*self.ny),\
             np.zeros(self.nx*self.ny), np.zeros(self.nx*self.ny)]) # Initialize variables in Adam algorithm: [m, v, m_hat, v_hat]
@@ -124,12 +81,9 @@ class Optimizer:
             if linear_map: cond = np.clip(primal, 0, 1)*5.8e7
             # else: cond = 10**(np.clip(primal, 0, 1) - 4) # original mapping from paper
             else: 
-                if index == 0: 
-                    cond = primal*5.8e7 # linear
-                    primal = -np.log(1/primal - ones) # since default generation is binary
-                else:
-                    exp_neg_primal = np.exp(-primal)
-                    cond = 1/(ones + exp_neg_primal)*5.8e7 # 5.8e7*sigmoid(primal)
+                if index == 0: primal = 42 * (primal - 0.5*ones) # since default generation is binary but we don't want [0,1] interval
+                primal = np.clip(primal, -21, 21) # otherwise inf, or nan raised (e^21 ~= 1.3e9)
+                cond = 1/(ones + np.exp(-primal))*5.8e7 # 5.8e7*sigmoid(primal)
             # apply Gaussian filter
             cond_smoothed = scimage.gaussian_filter(cond, radius)
             # calculate gradient by adjoint method
@@ -148,7 +102,7 @@ class Optimizer:
             file.close()
             # Record grad_CST
             file = open(self.results_history_path['grad_CST'], "a")
-            file.write(f"Iteration{index}, rms={np.sqrt(np.mean(grad_CST**2))}\n")
+            file.write(f"Iteration{index}, rms_grad_CST={np.sqrt(np.mean(grad_CST**2))}\n")
             file.write(f"{grad_CST}\n")
             file.close() 
             # -------------------------------------------
@@ -158,19 +112,28 @@ class Optimizer:
             # first chain (derivatives of kernel)
             grad_cond = scimage.gaussian_filter(grad_CST, radius)
             # second chain
-            if linear_map: cond_by_primal = ones*5.8e7 # linear case
+            if linear_map: cond_by_primal = 5.8e7 * ones # linear case
             # else: cond_by_primal = 9 * np.log(10) * 10**(9 * primal - 4) # original chain from paper
-            else: cond_by_primal = exp_neg_primal/(ones + exp_neg_primal)**2
+            else: cond_by_primal = 5.8e7 * np.exp(-primal)/(ones + np.exp(-primal))**2
             # overall
             grad_primal = grad_cond * cond_by_primal
             step = grad_primal
-            # Apply Adam algorithm
-            step, adam_var = self.Adam(step, index, adam_var)
+            # Apply Adam algorithm, then use normal gradient descent for better convergence detection
+            if radius < self.nx/4: # filter coverage small enough
+                if np.sqrt(np.mean((step-last_step)**2))<0.1: pass # not changing
+                else: step, adam_var = self.Adam(step, index, adam_var)
+            else: step, adam_var = self.Adam(step, index, adam_var)
             # update conductivity distribution
             primal = primal + alpha * step
 
             # Print rms to see overall trend
             print(f"rms_step = {np.sqrt(np.mean(step**2))}\n")
+            # Record step
+            file = open(self.results_history_path['step'], "a")
+            file.write(f"Iteration{index}, rms_step={np.sqrt(np.mean(step**2))}\n")
+            file.write(f"{step}\n")
+            file.close()
+
             # # Discriminant
             if np.dot(last_step, step) < 0: 
                 discriminant += 1
@@ -178,7 +141,7 @@ class Optimizer:
                 if discriminant >= 2: # oscillating around extremum
                     print("Local extremum detected, optimization process done")
                     break
-            elif np.sqrt(np.mean(step**2)) < 0.1: # Adam is not likely to oscillate
+            elif np.sqrt(np.mean(step**2)) < 0.1: # not likely to oscillate because of self penalty
                 discriminant += 1
                 print("Step < 0.1, optimization process done")
                 break
@@ -212,8 +175,9 @@ class Optimizer:
         grad = np.flip(E_received,0)*E_excited
         grad = -np.sum(grad, axis=0)
         return grad
-    
-    def power_time_reverse(self, powerPath, plot=False):
+
+    # Adjoint method -------------------------------------------------------------------------------
+    def power_time_reverse(self, powerPath):
         print("Executing time reversal...")
         # Read power file and make power list
         file = open(powerPath,'r')
@@ -278,6 +242,7 @@ class Optimizer:
         grid_E = np.array(grid_E) # [t0, t1, ...tk=[|E_1|,...|E_k|...,|E_169|],...t35]
         return grid_E
 
+    # Descent algorithm---------------------------------------------------------------------------------------
     def Adam(self, gradient, iteration, adam_var):
         beta1 = 0.9  # Decay rate for first moment
         beta2 = 0.999  # Decay rate for second moment
@@ -292,14 +257,93 @@ class Optimizer:
         step = adam_var[2] / (adam_var[3] ** 0.5 + epsilon)
         # Record Adam parameters
         file = open("results\\Adam.txt", "a")
-        file.write(f"Iteration{iteration}\n")
-        file.write(f"m={adam_var[0]}\nv={adam_var[1]}\nm_hat={adam_var[2]}\nv_hat={adam_var[3]}\nstep={step}\n")
+        file.write(f"Iteration{iteration}, m_hat={np.mean(adam_var[2])}, v_hat={np.mean(adam_var[3])}\n")
+        file.write(f"gradient=\n{gradient}\nm_hat=\n{adam_var[2]}\nv_hat=\n{adam_var[3]}\n")
         file.close()
         # return step
         return step, adam_var
+    
+    # Excitation control for antenna design--------------------------------------------------------------------
+    def specification(self, amplitudes, frequencies, ratio_bw, plot=True):
+        '''
+        - amplitudes: [Amplitudes] for each frequency component
+        - frequecies: Multiple [frequencies] in GHz [2.4, 3.6, 5.1]
+        - ratio_bw: Bandwidth-to-frequency [ratios] [0.1, 0.02, 0.5]
+        Time unit in nanoseconds (ns).
+        '''
+        max_freq = max(frequencies)
+        ## Make sure time step has no more than n digits, e.g. resolution=0.01 ns
+        if max_freq < 2.5: self.time_step = np.around(1/(4 * max_freq), 1)
+        elif max_freq < 25: self.time_step = np.around(1/(4 * max_freq), 2)
+        elif max_freq < 500: self.time_step = np.around(1/(2 * max_freq), 3)
+        else: 
+            print("Input frequency too high")
+            return None
+        
+        ## Calculate signal waveform
+        # Automatically determine the duration based on the widest Gaussian pulse width
+        max_sigma = max([1 / (2 * np.pi * freq * ratio) for freq, ratio in zip(frequencies, ratio_bw)])
+        self.time_end = 8 * max_sigma  # Duration of the pulse (6 sigma captures ~99.7% of energy)
+        self.time_end = int(self.time_end) 
+        # Time array shifted to start from 0 to self.time_end in nanoseconds (ns)
+        t = np.linspace(0, self.time_end, int(self.time_end/self.time_step)+1)
+        # Generate the superposition of Gaussian sine pulses with adjustable bandwidth ratios and amplitudes
+        signal = self.gaussian_sine_pulse_multi(amplitudes, frequencies, ratio_bw, t, self.time_end)
+        if plot: self.plot_wave_and_spectrum(signal, t, self.time_step)
 
+        ## Write excitation file
+        self.excitePath = "txtf\excitation.txt"
+        file = open(self.excitePath, "w")
+        file.write("#\n#'Time / ns'	'default [Real Part]'\n#---------------------------------\n") # IDK why but don't change a word
+        for index, value in enumerate(signal):
+            file.write(f"{t[index]} {value}\n")
+        file.close()
+
+    def gaussian_sine_pulse_multi(self, amplitudes, frequencies, ratios, t, duration):
+        """
+        Parameters:
+        - amplitudes: List or array of amplitudes for each frequency component.
+        - frequencies: List or array of frequencies (in GHz) for the sine waves.
+        - ratios: List or array of bandwidth-to-frequency ratios.
+        - t: Time array in nanoseconds (ns).
+        """
+        signal = np.zeros_like(t)
+        # Superpose the Gaussian sine waves for each frequency
+        for i, freq in enumerate(frequencies):
+            sigma = 1 / (2 * np.pi * freq * ratios[i])
+            sine_wave = np.sin(2 * np.pi * freq * (t-duration/2))
+            gaussian_envelope = amplitudes[i] * freq * ratios[i] * np.exp((-(t-duration/2)**2) / (2 * (sigma**2)))
+            signal += gaussian_envelope * sine_wave
+        return signal
+
+    def plot_wave_and_spectrum(self, signal, t, time_step):
+        # Time-domain waveform plot
+        plt.figure()
+        plt.plot(t, signal)
+        plt.title('Excitation Signal')
+        plt.xlabel('Time (ns)')
+        plt.ylabel('Amplitude')
+        plt.grid(True)
+        plt.show()
+        # Frequency spectrum plot
+        length = len(signal)
+        fft_signal = fft(signal)
+        fft_freq = fftfreq(length, time_step)
+        # Only take the positive half of the frequencies (real frequencies)
+        positive_freqs = fft_freq[:length // 2]
+        magnitude_spectrum = np.abs(fft_signal[:length // 2])
+        # Plot the magnitude spectrum
+        plt.figure()
+        plt.plot(positive_freqs, magnitude_spectrum)
+        plt.title('Frequency Spectrum')
+        plt.xlabel('Frequency (GHz)')
+        plt.ylabel('Amplitude')
+        plt.grid(True)
+        plt.show()
+
+    # just for convenience-------------------------------------------------------------------------
     def clean_results(self):
-        print("Cleaning results...")
+        print("Cleaning result legacy...")
         for result_path in self.results_history_path.values():
             if os.path.exists(result_path): os.remove(result_path)
         # Clean Adam.txt
@@ -310,7 +354,6 @@ class Optimizer:
         if os.path.exists("results\\s11.csv"): os.remove("results\\s11.csv")
         print("All files deleted successfully.")
 
-    # Plotting function--------------------
     def plot_distribution(self, file_path, true_position=True, start=0, end=1):
         print("Plotting distribution history...")
         # txt to array (iterations of distribution)
@@ -371,19 +414,80 @@ class Optimizer:
         print("Done, return array.")
         return result
     
+    def plot_all_results(self, batch=3, true_position=False):
+        for path in self.results_history_path.values():
+            for index in range(batch):
+                self.plot_distribution(path, true_position, start=index/batch, end=(index+1)/batch)
+                plt.show()
+    
+    # Some interesting initial antenna generator-------------------------------------------------------
+    def generate_binary_pixelated_antenna(self, n, shape, **kwargs):
+        print("Generating initial antenna...")
+        shape = self.generate_shape(n, shape, **kwargs)
+        initial = self.add_noise(shape.ravel())
+        print("Initial antenna generated")
+        return initial
+
+    def generate_shape(self, n, shape, **kwargs):
+        array = np.zeros((n, n), dtype=np.int32)
+        if shape == 'circle':
+            print("generating circle")
+            radius = kwargs.get('radius', n//3)
+            center = kwargs.get('center', (n // 2, n // 2))
+            y, x = np.ogrid[:n, :n]
+            dist_from_center = np.sqrt((x - center[0])**2 + (y - center[1])**2)
+            array[dist_from_center <= radius] = 1
+        elif shape == 'square': array = np.ones(n*n).reshape(n,-1)
+        elif shape == 'alphabet':
+            print("generatine alphabet")
+            letter = kwargs.get('letter', 'F')
+            font_size = kwargs.get('font_size', 8)
+            array = self.generate_alphabet(letter, n, font_size)
+        return array
+
+    def generate_alphabet(self, letter, n, font_size):
+        print(f"generating letter {letter}")
+        # Create a blank image with a white background
+        img = Image.new('L', (n, n), 0)  # 'L' mode for grayscale, initialized with black (0)
+        draw = ImageDraw.Draw(img)
+        # Load a default font
+        try:
+            font = ImageFont.truetype("arial.ttf", font_size)  # You can replace this with any valid font path
+        except:
+            font = ImageFont.load_default()
+        # Get the bounding box of the letter
+        bbox = draw.textbbox((0, 0), letter, font=font)
+        text_width, text_height = bbox[2] - bbox[0], bbox[3] - bbox[1]
+        # Calculate the position to center the letter
+        position = (n // 2 - text_width//1.8  , n // 2 - text_height//1.2)
+        # Draw the letter on the image
+        draw.text(position, letter, fill=1, font=font)
+        # Convert the image to a NumPy array (1 for white, 0 for black)
+        array = np.array(img)
+        return array
+
+    def add_noise(self, binary_array, dB=0):
+        print(f"adding noise with {dB}dB")
+        length = len(binary_array)
+        noise1 = np.random.rand(length)*0.00001*10**dB # 0.00001 because 5.8e7 scale is too large
+        noise2 = np.random.rand(length)*0.00001*10**dB # 0.00001 because 5.8e7 scale is too large
+        binary_array = binary_array + noise1 - noise2
+        binary_array = np.clip(binary_array, 0, 1)
+        return binary_array
+
+
 
 if __name__ == "__main__":
 
     # Optimize any given antenna
     optimizer = Optimizer()
-    optimizer.specification(2.4) # Fake, working on it
-    unit_initial_antenna = add_noise(generate_shape(shape='alphabet', letter='A').ravel(), dB=0)
-    optimizer.gradient_descent(unit_initial_antenna, linear_map=True)
+    # optimizer.specification([1, 1],[1.5, 2.4],[0.18, 0.1], False)
+    initial = optimizer.generate_binary_pixelated_antenna(n=int(L//D), shape='alphabet', letter='A')
+    optimizer.gradient_descent(initial, linear_map=False)
 
     # # Plot distribution of results
     # optimizer = Optimizer(call_controller=False)
-    # for path in optimizer.results_history_path.values():
-    #     batch = 3
-    #     for index in range(batch):
-    #         optimizer.plot_distribution(path, true_position=True, start=index/batch, end=(index+1)/batch)
-    #         plt.show()
+    # # optimizer.specification([1, 1],[1.5, 2.4],[0.18, 0.1])
+    # optimizer.plot_all_results(1, False)
+    
+    
