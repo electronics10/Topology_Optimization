@@ -19,7 +19,7 @@ class CSTInterface:
         open = False
         for pid in allpids:
             self.de = csti.DesignEnvironment.connect(pid)
-            self.de.set_quiet_mode(True) # suppress message box
+            # self.de.set_quiet_mode(True) # suppress message box
             print(f"Opening {self.full_path}...")
             self.prj = self.de.open_project(self.full_path)
             open = True
@@ -29,7 +29,7 @@ class CSTInterface:
             print("File path not found in current design environment...")
             print("Opening new design environment...")
             self.de = csti.DesignEnvironment.new()
-            self.de.set_quiet_mode(True) # suppress message box
+            # self.de.set_quiet_mode(True) # suppress message box
             self.prj = self.de.open_project(self.full_path)
             open = True
             print(f"{self.full_path} open")
@@ -139,14 +139,14 @@ class CSTInterface:
         res = self.excute_vba(command)
         return res
     
-    def set_port(self):
+    def set_port(self, point1, point2): # Not a robust piece of code, but anyway
         command = ['Sub Main', 'Pick.PickEdgeFromId "component1:feed", "1", "1"', 
                    'Pick.PickEdgeFromId "component1:coaxouter", "1", "1"', 
                    'With DiscreteFacePort ', '.Reset ', '.PortNumber "1" ', 
                    '.Type "SParameter"', '.Label ""', '.Folder ""', '.Impedance "50.0"', 
                    '.VoltageAmplitude "1.0"', '.CurrentAmplitude "1.0"', '.Monitor "True"', 
-                   '.CenterEdge "True"', '.SetP1 "True", "5.7", "-0.5", "-6.635"', 
-                   '.SetP2 "True", "6.6", "-0.5", "-6.635"', '.LocalCoordinates "False"', 
+                   '.CenterEdge "True"', f'.SetP1 "True", "{point1[0]}", "{point1[1]}", "{point1[2]}"', 
+                   f'.SetP2 "True", "{point2[0]}", "{point2[1]}", "{point2[2]}"', '.LocalCoordinates "False"', 
                    '.InvertDirection "False"', '.UseProjection "False"', 
                    '.ReverseProjection "False"', '.FaceType "Linear"', '.Create ', 
                    'End With', 'End Sub']
@@ -158,23 +158,23 @@ class CSTInterface:
         res = self.excute_vba(command)
         return res
     
-    def export_E_field(self, outputPath, resultPath, step):
+    def export_E_field(self, outputPath, resultPath, time_end, d_step):
         command = ['Sub Main',
         'SelectTreeItem  ("%s")' % resultPath, 
         'With ASCIIExport', '.Reset',
         f'.FileName ("{outputPath}")',
-        '.SetSampleRange(0, 35)',
-        '.Mode ("FixedWidth")', '.Step (%s)' % step,
+        f'.SetTimeRange(0, {time_end})',
+        '.Mode ("FixedWidth")', f'.Step ({d_step})',
         '.Execute', 'End With', 'End Sub']
         res = self.excute_vba(command)
         return res
     
-    def export_power(self, outputPath, resultPath):
+    def export_power(self, outputPath, resultPath, time_end):
         command = ['Sub Main',
-        'SelectTreeItem  ("%s")' % resultPath, 
+        f'SelectTreeItem  ("{resultPath}")', 
         'With ASCIIExport', '.Reset',
         f'.FileName ("{outputPath}")',
-        '.SetSampleRange(0, 35)',
+        f'.SetTimeRange(0, {time_end})',
         '.StepX (4)', '.StepY (4)',
         '.Execute', 'End With', 'End Sub']
         res = self.excute_vba(command)
@@ -190,21 +190,32 @@ class CSTInterface:
 class Controller(CSTInterface):
     def __init__(self, fname):
         super().__init__(fname)
+        self.Lg = 104
+        self.Wg = 104
+        self.hc = 0.035
+        self.hs = 1.6
+        self.feedx = 5
+        self.feedy = 0
+        self.Ld = None
+        self.Wd = None
+        self.d = None
+        self.time_step = None
+        self.time_end = None
+
 
     # initialize ground, substrate, feed, and port
-    def set_base(self, Lg=104, Wg=104, hc=0.035, hs=1.6, feedx=5, feedy=-0.5):
+    def set_base(self):
         print("Setting base...")
         # Create ground, substrate, feed, and port
         ground = ['Component.New "component1"', 'Component.New "component2"',
                    'With Brick', '.Reset ', 
                    '.Name "ground" ', '.Component "component1" ', 
-                   '.Material "Copper (annealed)" ', f'.Xrange "{-Lg/2}", "{Lg/2}" ', 
-                   f'.Yrange "{-Wg/2}", "{Wg/2}" ', f'.Zrange "{-hc-hs}", "{-hs}" ', '.Create', 'End With']
-        substrate = ['With Material', '.Reset', '.Name "FR-4 (lossy)"', 
+                   '.Material "Copper (annealed)" ', f'.Xrange "{-self.Lg/2}", "{self.Lg/2}" ', 
+                   f'.Yrange "{-self.Wg/2}", "{self.Wg/2}" ', f'.Zrange "{-self.hc-self.hs}", "{-self.hs}" ', '.Create', 'End With']
+        substrate = ['With Material', '.Reset', '.Name "FR-4 (loss free)"', 
                    '.Folder ""', '.FrqType "all"', '.Type "Normal"', 
                    '.SetMaterialUnit "GHz", "mm"', '.Epsilon "4.3"', '.Mu "1.0"', 
-                   '.Kappa "0.0"', '.TanD "0.025"', '.TanDFreq "10.0"', 
-                   '.TanDGiven "True"', '.TanDModel "ConstTanD"', '.KappaM "0.0"', 
+                   '.Kappa "0.0"', '.KappaM "0.0"', 
                    '.TanDM "0.0"', '.TanDMFreq "0.0"', '.TanDMGiven "False"', 
                    '.TanDMModel "ConstKappa"', '.DispModelEps "None"', 
                    '.DispModelMu "None"', '.DispersiveFittingSchemeEps "General 1st"', 
@@ -214,32 +225,32 @@ class Controller(CSTInterface):
                    '.SetActiveMaterial "all"', '.Colour "0.94", "0.82", "0.76"', 
                    '.Wireframe "False"', '.Transparency "0"', '.Create', 'End With',
                    'With Brick', '.Reset ', '.Name "substrate" ', 
-                   '.Component "component1" ', '.Material "FR-4 (lossy)" ', 
-                   f'.Xrange "{-Lg/2}", "{Lg/2}" ', f'.Yrange "{-Wg/2}", "{Wg/2}" ', 
-                   f'.Zrange "{-hs}", "0" ', '.Create', 'End With ']
+                   '.Component "component1" ', '.Material "FR-4 (loss free)" ', 
+                   f'.Xrange "{-self.Lg/2}", "{self.Lg/2}" ', f'.Yrange "{-self.Wg/2}", "{self.Wg/2}" ', 
+                   f'.Zrange "{-self.hs}", "0" ', '.Create', 'End With ']
         ground_sub = ['With Cylinder ', '.Reset ', '.Name "sub" ', '.Component "component1" ', 
-                   '.Material "Copper (annealed)" ', f'.OuterRadius "{hs}" ', 
-                   '.InnerRadius "0.0" ', '.Axis "z" ', f'.Zrange "{-hc-hs}", "{-hs}" ', 
-                   f'.Xcenter "{feedx}" ', f'.Ycenter "{feedy}" ', '.Segments "0" ', '.Create ', 
+                   '.Material "Copper (annealed)" ', f'.OuterRadius "{self.hs}" ', 
+                   '.InnerRadius "0.0" ', '.Axis "z" ', f'.Zrange "{-self.hc-self.hs}", "{-self.hs}" ', 
+                   f'.Xcenter "{self.feedx}" ', f'.Ycenter "{self.feedy}" ', '.Segments "0" ', '.Create ', 
                    'End With', 'Solid.Subtract "component1:ground", "component1:sub"']
         substrate_sub = ['With Cylinder ', '.Reset ', '.Name "feedsub" ', 
-                   '.Component "component1" ', '.Material "FR-4 (lossy)" ', 
-                   f'.OuterRadius "{hs/2-0.1}" ', '.InnerRadius "0.0" ', '.Axis "z" ', 
-                   f'.Zrange "{-hs}", "0" ', f'.Xcenter "{feedx}" ', f'.Ycenter "{feedy}" ', 
+                   '.Component "component1" ', '.Material "FR-4 (loss free)" ', 
+                   f'.OuterRadius "{self.hs/2-0.1}" ', '.InnerRadius "0.0" ', '.Axis "z" ', 
+                   f'.Zrange "{-self.hs}", "0" ', f'.Xcenter "{self.feedx}" ', f'.Ycenter "{self.feedy}" ', 
                    '.Segments "0" ', '.Create ', 'End With', 
                    'Solid.Subtract "component1:substrate", "component1:feedsub"'] 
         feed = ['With Cylinder ', '.Reset ', '.Name "feed" ', '.Component "component1" ', 
-                   '.Material "PEC" ', f'.OuterRadius "{hs/2-0.1}" ', '.InnerRadius "0.0" ', 
-                   '.Axis "z" ', f'.Zrange "{-5-hc-hs}", "{hc}" ', f'.Xcenter "{feedx}" ', 
-                   f'.Ycenter "{feedy}" ', '.Segments "0" ', '.Create ', 'End With']
+                   '.Material "PEC" ', f'.OuterRadius "{self.hs/2-0.1}" ', '.InnerRadius "0.0" ', 
+                   '.Axis "z" ', f'.Zrange "{-5-self.hc-self.hs}", "{self.hc}" ', f'.Xcenter "{self.feedx}" ', 
+                   f'.Ycenter "{self.feedy}" ', '.Segments "0" ', '.Create ', 'End With']
         coax = ['With Cylinder ', '.Reset ', '.Name "coax" ', '.Component "component1" ', 
-                   '.Material "Vacuum" ', f'.OuterRadius "{hs-0.01}" ', f'.InnerRadius "{hs/2-0.1}" ', 
-                   '.Axis "z" ', f'.Zrange "{-5-hc-hs}", "{-hc-hs}" ', f'.Xcenter "{feedx}" ', 
-                   f'.Ycenter "{feedy}" ', '.Segments "0" ', '.Create ', 'End With', 
+                   '.Material "Vacuum" ', f'.OuterRadius "{self.hs-0.01}" ', f'.InnerRadius "{self.hs/2-0.1}" ', 
+                   '.Axis "z" ', f'.Zrange "{-5-self.hc-self.hs}", "{-self.hc-self.hs}" ', f'.Xcenter "{self.feedx}" ', 
+                   f'.Ycenter "{self.feedy}" ', '.Segments "0" ', '.Create ', 'End With', 
                    'With Cylinder ', '.Reset ', '.Name "coaxouter" ', 
-                   '.Component "component1" ', '.Material "PEC" ', f'.OuterRadius "{hs}" ', 
-                   f'.InnerRadius "{hs-0.01}" ', '.Axis "z" ', f'.Zrange "{-5-hc-hs}", "{-hc-hs}" ', 
-                   f'.Xcenter "{feedx}" ', f'.Ycenter "{feedy}" ', '.Segments "0" ', '.Create ', 
+                   '.Component "component1" ', '.Material "PEC" ', f'.OuterRadius "{self.hs}" ', 
+                   f'.InnerRadius "{self.hs-0.01}" ', '.Axis "z" ', f'.Zrange "{-5-self.hc-self.hs}", "{-self.hc-self.hs}" ', 
+                   f'.Xcenter "{self.feedx}" ', f'.Ycenter "{self.feedy}" ', '.Segments "0" ', '.Create ', 
                    'End With']
         command = ground + substrate + ground_sub + substrate_sub + feed + coax
         command = "\n".join(command)
@@ -247,25 +258,25 @@ class Controller(CSTInterface):
         self.save()
         print("Base set")
     
-    def set_monitor(self, Ld, d, hc=0.035, hs=1.6, feedx=5, feedy=-0.5):
+    def set_monitor(self):
         print("Setting monitor...")
-        margin = (Ld - d)/2
+        margin = (self.Ld - self.d)/2
         # Set monitor to read E field on domain
         EonPatch = ['With Monitor ', '.Reset ', '.Name "E_field_on_patch" ', 
                    '.Dimension "Volume" ', '.Domain "Time" ', '.FieldType "Efield" ', 
-                   '.Tstart "0" ', '.Tstep "0.1" ', '.Tend "3.5" ', '.UseTend "True" ', 
+                   '.Tstart "0" ', f'.Tstep "{self.time_step}" ', f'.Tend "{self.time_end}" ', '.UseTend "True" ', 
                    '.UseSubvolume "True" ', '.Coordinates "Free" ', 
-                   f'.SetSubvolume "0", "0", "0", "0", "{-5-hc-hs}", "{hc}" ', 
+                   f'.SetSubvolume "0", "0", "0", "0", "{-5-self.hc-self.hs}", "{self.hc}" ', 
                    f'.SetSubvolumeOffset "{margin}", "{margin}", "{margin}", "{margin}", "{margin}", "{margin}" ', 
                    '.SetSubvolumeInflateWithOffset "True" ', '.PlaneNormal "z" ', 
-                   f'.PlanePosition "{hc}" ', '.Create ', 'End With']
+                   f'.PlanePosition "{self.hc}" ', '.Create ', 'End With']
         # Set monitor to read power at feed
         PonFeed = ['With Monitor ', 
                    '.Reset ', '.Name "power_on_feed" ', '.Dimension "Volume" ', 
                    '.Domain "Time" ', '.FieldType "Powerflow" ', 
-                   '.Tstart "0" ', '.Tstep "0.1" ', '.Tend "3.5" ', 
+                   '.Tstart "0" ', f'.Tstep "{self.time_step}" ', f'.Tend "{self.time_end}" ', 
                    '.UseTend "True" ', '.UseSubvolume "True" ', '.Coordinates "Free" ', 
-                   f'.SetSubvolume "{feedx-1}", "{feedx+1}", "{feedy-1}", "{feedy+1}", "{-5-hc-hs}", "{hc}" ', 
+                   f'.SetSubvolume "{self.feedx-1}", "{self.feedx+1}", "{self.feedy-1}", "{self.feedy+1}", "{-5-self.hc-self.hs}", "{self.hc}" ', 
                    '.SetSubvolumeOffset "0.0", "0.0", "0.0", "0.0", "0.0", "0.0" ', 
                    '.SetSubvolumeInflateWithOffset "True" ', '.PlaneNormal "z" ', 
                    '.PlanePosition "0.035" ', '.Create ', 'End With']
@@ -275,10 +286,10 @@ class Controller(CSTInterface):
         self.save()
         print("Monitor set")
 
-    def set_domain(self, Ld, Wd, d, hc=0.035): 
+    def set_domain(self): 
         print("Setting domain...")
         # Initialize domain with uniform conductivity
-        nx, ny = (int(Ld//d), int(Wd//d))
+        nx, ny = (int(self.Ld//self.d), int(self.Wd//self.d))
         cond = np.zeros(nx*ny)
         print(f"{nx*ny} pixels in total...")
         # Define materials first
@@ -286,14 +297,14 @@ class Controller(CSTInterface):
         command = []
         # Define shape and index based on materials
         for index, sigma in enumerate(cond): 
-            midpoint = (Ld/2, Wd/2)
+            midpoint = (self.Ld/2, self.Wd/2)
             xi = index%nx
             yi = index//nx
-            xmin = xi*d-midpoint[0]
-            xmax = xmin+d
-            ymin = yi*d-midpoint[1]
-            ymax = ymin+d
-            command += self.create_shape(index, xmin, xmax, ymin, ymax, hc)
+            xmin = xi*self.d-midpoint[0]
+            xmax = xmin+self.d
+            ymin = yi*self.d-midpoint[1]
+            ymax = ymin+self.d
+            command += self.create_shape(index, xmin, xmax, ymin, ymax, self.hc)
         command = "\n".join(command)
         self.prj.modeler.add_to_history("domain",command)
         self.save()
@@ -309,7 +320,7 @@ class Controller(CSTInterface):
         self.prj.modeler.add_to_history("material update",command_material)
         print("Conductivity distribution updated")
 
-    def feed_excitation(self, feedPath, step):
+    def feed_excitation(self, feedPath):
         print("Start feed exciation")
         # Import feed file
         print("fe: importing feed file")
@@ -317,16 +328,18 @@ class Controller(CSTInterface):
         self.set_excitation(feedPath)
         # Start simulation with feed
         print("fe: simulating")
-        self.set_port()
+        point1 = (self.feedx+self.hs/2-0.1, self.feedy, -5-self.hc-self.hs)
+        point2 = (self.feedx+self.hs, self.feedy, -5-self.hc-self.hs)
+        self.set_port(point1, point2)
         self.start_simulate()
         # Export E field on patch to txt
         E_Path = "txtf\E_excited.txt"
         outputPath = os.getcwd() + "\\" + E_Path
-        self.export_E_field(outputPath, "2D/3D Results\\E-Field\\E_field_on_patch [1]", step)
+        self.export_E_field(outputPath, "2D/3D Results\\E-Field\\E_field_on_patch [1]", self.time_end, self.d)
         print(f"fe: electric field exported as {outputPath}")
         # Record s11 to s11.csv
         s11 = self.read('1D Results\\S-Parameters\\S1,1')
-        with open('txtf\\s11.csv', 'a', newline='') as csvfile:
+        with open('results\\s11.csv', 'a', newline='') as csvfile:
             writer = csv.writer(csvfile)
             for line in s11: # [[freq, s11, 50+j],...]
                 line = np.abs(line) # change s11 from complex to absolute
@@ -340,7 +353,7 @@ class Controller(CSTInterface):
         print(f"Return E_Path")
         return E_Path
 
-    def plane_wave_excitation(self, step, excitePath=None):
+    def plane_wave_excitation(self, excitePath=None):
         print("Start plane wave excitation")
         # Import excitation file
         if excitePath: 
@@ -354,7 +367,7 @@ class Controller(CSTInterface):
         # Export E field on patch to txt
         E_Path = "txtf\E_received.txt"
         outputPath = os.getcwd() + "\\" + E_Path
-        self.export_E_field(outputPath, "2D/3D Results\\E-Field\\E_field_on_patch [pw]", step)
+        self.export_E_field(outputPath, "2D/3D Results\\E-Field\\E_field_on_patch [pw]", self.time_end, self.d)
         print(f"pw: electric field exported as {outputPath}")
         # Legacy?-----------------------------------
         # # Return power on feed, must set Result Template on CST by hand in advance (IDK how to do it by code)
@@ -364,7 +377,7 @@ class Controller(CSTInterface):
         # Export Power Flow to txt
         powerPath = "txtf\power.txt"
         outputPath = os.getcwd() + "\\" + powerPath
-        self.export_power(outputPath, "2D/3D Results\\Power Flow\\power_on_feed [pw]")
+        self.export_power(outputPath, "2D/3D Results\\Power Flow\\power_on_feed [pw]", self.time_end)
         print(f"pw: power flow exported as {outputPath}")
         # Must delete before return, otherwise CST will save and raise popup window in next iteration
         self.delete_results() # otherwise CST may raise popup window
