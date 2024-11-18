@@ -158,23 +158,25 @@ class CSTInterface:
         res = self.excute_vba(command)
         return res
     
-    def export_E_field(self, outputPath, resultPath, time_end, d_step):
+    def export_E_field(self, outputPath, resultPath, time_end, time_step, d_step):
+        total_samples = int(time_end/time_step)
         command = ['Sub Main',
         'SelectTreeItem  ("%s")' % resultPath, 
         'With ASCIIExport', '.Reset',
         f'.FileName ("{outputPath}")',
-        f'.SetTimeRange(0, {time_end})',
+        f'.SetSampleRange(0, {total_samples})',
         '.Mode ("FixedWidth")', f'.Step ({d_step})',
         '.Execute', 'End With', 'End Sub']
         res = self.excute_vba(command)
         return res
     
-    def export_power(self, outputPath, resultPath, time_end):
+    def export_power(self, outputPath, resultPath, time_end, time_step):
+        total_samples = int(time_end/time_step)
         command = ['Sub Main',
         f'SelectTreeItem  ("{resultPath}")', 
         'With ASCIIExport', '.Reset',
         f'.FileName ("{outputPath}")',
-        f'.SetTimeRange(0, {time_end})',
+        f'.SetSampleRange(0, {total_samples})',
         '.StepX (4)', '.StepY (4)',
         '.Execute', 'End With', 'End Sub']
         res = self.excute_vba(command)
@@ -335,7 +337,7 @@ class Controller(CSTInterface):
         # Export E field on patch to txt
         E_Path = "txtf\E_excited.txt"
         outputPath = os.getcwd() + "\\" + E_Path
-        self.export_E_field(outputPath, "2D/3D Results\\E-Field\\E_field_on_patch [1]", self.time_end, self.d)
+        self.export_E_field(outputPath, "2D/3D Results\\E-Field\\E_field_on_patch [1]", self.time_end, self.time_step, self.d)
         print(f"fe: electric field exported as {outputPath}")
         # Record s11 to s11.csv
         s11 = self.read('1D Results\\S-Parameters\\S1,1')
@@ -367,7 +369,7 @@ class Controller(CSTInterface):
         # Export E field on patch to txt
         E_Path = "txtf\E_received.txt"
         outputPath = os.getcwd() + "\\" + E_Path
-        self.export_E_field(outputPath, "2D/3D Results\\E-Field\\E_field_on_patch [pw]", self.time_end, self.d)
+        self.export_E_field(outputPath, "2D/3D Results\\E-Field\\E_field_on_patch [pw]", self.time_end, self.time_step, self.d)
         print(f"pw: electric field exported as {outputPath}")
         # Legacy?-----------------------------------
         # # Return power on feed, must set Result Template on CST by hand in advance (IDK how to do it by code)
@@ -377,7 +379,7 @@ class Controller(CSTInterface):
         # Export Power Flow to txt
         powerPath = "txtf\power.txt"
         outputPath = os.getcwd() + "\\" + powerPath
-        self.export_power(outputPath, "2D/3D Results\\Power Flow\\power_on_feed [pw]", self.time_end)
+        self.export_power(outputPath, "2D/3D Results\\Power Flow\\power_on_feed [pw]", self.time_end, self.time_step)
         print(f"pw: power flow exported as {outputPath}")
         # Must delete before return, otherwise CST will save and raise popup window in next iteration
         self.delete_results() # otherwise CST may raise popup window
