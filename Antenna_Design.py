@@ -94,8 +94,8 @@ class Optimizer:
                 cond = primal*5.8e7
             # else: cond = 10**(np.clip(primal, 0, 1) - 4) # original mapping from paper
             else: 
-                if index == 0: primal = 42 * (primal - 0.5*ones) # since default generation is binary but we don't want [0,1] interval
-                primal = np.clip(primal, -21, 21) # otherwise inf, or nan raised (e^21 ~= 1.3e9)
+                if index == 0: primal = 50 * (primal - 0.5*ones) # since default generation is binary but we don't want [0,1] interval
+                primal = np.clip(primal, -25, 25) # otherwise inf, or nan raised (e^21 ~= 1.3e9)
                 cond = 1/(ones + np.exp(-primal))*5.8e7 # 5.8e7*sigmoid(primal)
             # apply Gaussian filter
             if filter: cond_smoothed = scimage.gaussian_filter(cond, radius)
@@ -131,10 +131,12 @@ class Optimizer:
             else: grad_cond = grad_CST
             # second chain
             if linear_map: 
-                cond_by_primal = 5.8e7 * ones # linear case
-                # cond_by_primal = ones # won't converge adjustment
-            # else: cond_by_primal = 9 * np.log(10) * 10**(9 * primal - 4) # original chain from paper
-            else: cond_by_primal = 5.8e7 * np.exp(-primal)/(ones + np.exp(-primal))**2
+                # cond_by_primal = 5.8e7 * ones # linear case
+                cond_by_primal = 10 * ones # won't converge adjustment
+            else: 
+                # cond_by_primal = 9 * np.log(10) * 10**(9 * primal - 4) # original chain from paper
+                # cond_by_primal = 5.8e7 * np.exp(-primal)/(ones + np.exp(-primal))**2
+                cond_by_primal = 10 * ones
             # overall
             grad_primal = grad_cond * cond_by_primal
             step = grad_primal
@@ -157,16 +159,22 @@ class Optimizer:
             file.close()
 
             # # Discriminant
-            if np.sqrt(np.mean(grad_CST**2)) < 0.002988: # heuristic (should come up with a more robust criterion)
+            criterion = 0.003
+            if np.sqrt(np.mean(grad_CST**2)) < criterion: # heuristic (should come up with a more robust criterion)
                 discriminant += 1
-                print("rms_grad_CST < 0.002988, optimization process done")
-                break
-            elif np.sqrt(np.mean(grad_CST**2)) < 0.01: # heuristic
+                print(f"rms_grad_CST < {criterion}, optimization process done")
+                if discriminant > 0: # Set converge (last update) for transmitter to read S11
+                    end_time = time.time()
+                    print(f"{index+2} iterations in total, take time {end_time-start_time}")
+                    break
+            elif np.sqrt(np.mean(grad_CST**2)) < 10*criterion: # heuristic
                 if np.dot(last_grad_CST, grad_CST) < 0: 
                     discriminant += 1
                     print(f"Discriminant detected, discriminant = {discriminant}")
                     if discriminant >= 4: # oscillating around extremum
                         print("Local extremum detected, optimization process done")
+                        end_time = time.time()
+                        print(f"{index+2} iterations in total, take time {end_time-start_time}")
                         break
             # update radius to make next descent finer
             if filter: radius *= gamma
@@ -174,10 +182,7 @@ class Optimizer:
             # update last_grad_CST for next discriminant
             last_grad_CST = grad_CST
         if discriminant == 0: print(f"Problem unsolvable in {index+1} iterations")
-        # Set converge (last update) for transmitter to read S11
-        grad_CST = self.calculate_gradient(cond_smoothed)
-        end_time = time.time()
-        print(f"{index+2} iterations in total, take time {end_time-start_time}")
+        
 
     def calculate_gradient(self, cond):
         print("Calculating gradient...")
@@ -196,6 +201,8 @@ class Optimizer:
         print("Calculating gradient by adjoint method...")
         E_received = self.Efile2gridE(Er_Path)
         E_excited = self.Efile2gridE(Et_Path)
+        print("E_r, E_r[0]:", len(E_received), len(E_received[0]))
+        print("E_e, E_e[0]", len(E_excited), len(E_excited[0]))
         grad = np.flip(E_received,0)*E_excited # adjoint method
         grad = -np.sum(grad, axis=0) # adjoint method continued (see paper: "Topology Optimization of Metallic Antenna")
         return grad
@@ -264,7 +271,7 @@ class Optimizer:
                 time = []
         grid_E = grid_E[1:] # delete initial []
         file1.close()
-        grid_E = np.array(grid_E) # [t0, t1, ...tk=[|E_1|,...|E_k|...,|E_169|],...t35]
+        grid_E = np.array(grid_E) # [t0, t1, ...tk=[|E_1|,...|E_k|...,|E_169|],...tn]
         return grid_E
 
     # Descent algorithm---------------------------------------------------------------------------------------
@@ -289,40 +296,43 @@ class Optimizer:
         return step, adam_var
     
     # Excitation control for antenna design--------------------------------------------------------------------
-    def specification(self, amplitudes, frequencies, ratio_bw, plot=True):
-        '''
-        - amplitudes: [Amplitudes] for each frequency component
-        - frequecies: Multiple [frequencies] in GHz [2.4, 3.6, 5.1]
-        - ratio_bw: Bandwidth-to-frequency [ratios] [0.1, 0.02, 0.5]
-        Time unit in nanoseconds (ns).
-        '''
-        max_freq = max(frequencies)
-        ## Make sure time step has no more than n digits, e.g. resolution=0.01 ns
-        if max_freq < 2.5: self.time_step = np.around(1/(4 * max_freq), 1)
-        elif max_freq < 25: self.time_step = np.around(1/(4 * max_freq), 2)
-        elif max_freq < 500: self.time_step = np.around(1/(2 * max_freq), 3)
-        else: 
-            print("Input frequency too high")
-            return None
-        
-        ## Calculate signal waveform
-        # Automatically determine the duration based on the widest Gaussian pulse width
-        max_sigma = max([1 / (2 * np.pi * freq * ratio) for freq, ratio in zip(frequencies, ratio_bw)])
-        self.time_end = 8 * max_sigma  # Duration of the pulse (6 sigma captures ~99.7% of energy)
-        self.time_end = int(self.time_end) 
-        # Time array shifted to start from 0 to self.time_end in nanoseconds (ns)
-        t = np.linspace(0, self.time_end, int(self.time_end/self.time_step)+1)
-        # Generate the superposition of Gaussian sine pulses with adjustable bandwidth ratios and amplitudes
-        signal = self.gaussian_sine_pulse_multi(amplitudes, frequencies, ratio_bw, t, self.time_end)
-        if plot: self.plot_wave_and_spectrum(signal, t, self.time_step)
+    def specification(self, amplitudes=[1, 1], frequencies=[1.5, 2.4], ratio_bw=[0.18, 0.1], plot=True, CST_default=False):
+        if CST_default: pass
+        else:
+            print("customizing specification")
+            '''
+            - amplitudes: [Amplitudes] for each frequency component
+            - frequecies: Multiple [frequencies] in GHz [2.4, 3.6, 5.1]
+            - ratio_bw: Bandwidth-to-frequency [ratios] [0.1, 0.02, 0.5]
+            Time unit in nanoseconds (ns).
+            '''
+            max_freq = max(frequencies)
+            ## Make sure time step has no more than n digits, e.g. resolution=0.01 ns
+            if max_freq < 2.5: self.time_step = np.around(1/(4 * max_freq), 1)
+            elif max_freq < 25: self.time_step = np.around(1/(4 * max_freq), 2)
+            elif max_freq < 500: self.time_step = np.around(1/(2 * max_freq), 3)
+            else: 
+                print("Input frequency too high")
+                return None
+            
+            ## Calculate signal waveform
+            # Automatically determine the duration based on the widest Gaussian pulse width
+            max_sigma = max([1 / (2 * np.pi * freq * ratio) for freq, ratio in zip(frequencies, ratio_bw)])
+            self.time_end = 8 * max_sigma  # Duration of the pulse (6 sigma captures ~99.7% of energy)
+            self.time_end = int(self.time_end) 
+            # Time array shifted to start from 0 to self.time_end in nanoseconds (ns)
+            t = np.linspace(0, self.time_end, int(self.time_end/self.time_step)+1)
+            # Generate the superposition of Gaussian sine pulses with adjustable bandwidth ratios and amplitudes
+            signal = self.gaussian_sine_pulse_multi(amplitudes, frequencies, ratio_bw, t, self.time_end)
+            if plot: self.plot_wave_and_spectrum(signal, t, self.time_step)
 
-        ## Write excitation file
-        self.excitePath = "txtf\excitation.txt"
-        file = open(self.excitePath, "w")
-        file.write("#\n#'Time / ns'	'default [Real Part]'\n#---------------------------------\n") # IDK why but don't change a word
-        for index, value in enumerate(signal):
-            file.write(f"{t[index]} {value}\n")
-        file.close()
+            ## Write excitation file
+            self.excitePath = "txtf\excitation.txt"
+            file = open(self.excitePath, "w")
+            file.write("#\n#'Time / ns'	'default [Real Part]'\n#---------------------------------\n") # IDK why but don't change a word
+            for index, value in enumerate(signal):
+                file.write(f"{t[index]} {value}\n")
+            file.close()
 
         ## Reset monitor and impulse time informtion for controller
         self.update_controller()
@@ -452,8 +462,8 @@ if __name__ == "__main__":
 
     # # Optimize any given antenna
     optimizer = Optimizer(set_environment=False)
-    optimizer.specification([1, 1],[1.5, 2.4],[0.18, 0.1], plot=False)
+    optimizer.specification(plot=False)
     initial = optimizer.generate_binary_pixelated_antenna(n=int(L//D), shape='square')
-    optimizer.gradient_descent(initial, linear_map=True, filter=False, Adam=True)
+    optimizer.gradient_descent(initial, linear_map=True, filter=False, Adam=False)
     
     
