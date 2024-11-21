@@ -136,7 +136,7 @@ class Optimizer:
             else: 
                 # cond_by_primal = 9 * np.log(10) * 10**(9 * primal - 4) # original chain from paper
                 # cond_by_primal = 5.8e7 * np.exp(-primal)/(ones + np.exp(-primal))**2
-                cond_by_primal = 10 * ones
+                cond_by_primal = 300 * ones
             # overall
             grad_primal = grad_cond * cond_by_primal
             step = grad_primal
@@ -462,8 +462,8 @@ if __name__ == "__main__":
 
     # # Optimize any given antenna
     optimizer = Optimizer(set_environment=False)
-    optimizer.specification(plot=False)
+    optimizer.specification(amplitudes=[1], frequencies=[2], ratio_bw=[0.1], plot=True)
     initial = optimizer.generate_binary_pixelated_antenna(n=int(L//D), shape='square')
-    optimizer.gradient_descent(initial, linear_map=True, filter=False, Adam=False)
+    optimizer.gradient_descent(initial, linear_map=False, filter=True, Adam=False)
     
     
