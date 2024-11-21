@@ -138,7 +138,7 @@ class Optimizer:
             else: 
                 # cond_by_primal = 9 * np.log(10) * 10**(9 * primal - 4) # original chain from paper
                 # cond_by_primal = 5.8e7 * np.exp(-primal)/(ones + np.exp(-primal))**2
-                cond_by_primal = 100 * ones
+                cond_by_primal = 10 * ones
             # overall
             grad_primal = grad_cond * cond_by_primal
             step = grad_primal
@@ -149,8 +149,10 @@ class Optimizer:
                 #     else: step, adam_var = self.Adam(step, index+1, adam_var)
                 # else: step, adam_var = self.Adam(step, index+1, adam_var)
             # update conductivity distribution
-            if index % 2 == 1: alpha = 1
-            else: alpha = 0.1
+            if index % 4 == 0: alpha = 0.1
+            elif index % 4 == 1: alpha = 1
+            elif index % 4 == 2: alpha = 0.7
+            else: alpha = 0.4
             primal = primal + alpha * step
 
             # Print rms to see overall trend
