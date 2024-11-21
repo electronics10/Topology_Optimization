@@ -67,7 +67,7 @@ class Optimizer:
         print("transmitter environment set")
 
     # Optimization core---------------------------------------------------------------------------------
-    def gradient_descent(self, primal, alpha=0.5, gamma=0.9, linear_map=False, filter=True, Adam=True):
+    def gradient_descent(self, primal, alpha=0.1, gamma=0.9, linear_map=False, filter=True, Adam=True):
         self.clean_results() # clean legacy, otherwise troublesome when plot
         print("Executing gradient ascent:\n")
         '''
@@ -138,7 +138,7 @@ class Optimizer:
             else: 
                 # cond_by_primal = 9 * np.log(10) * 10**(9 * primal - 4) # original chain from paper
                 # cond_by_primal = 5.8e7 * np.exp(-primal)/(ones + np.exp(-primal))**2
-                cond_by_primal = 10 * ones
+                cond_by_primal = 100 * ones
             # overall
             grad_primal = grad_cond * cond_by_primal
             step = grad_primal
@@ -149,6 +149,8 @@ class Optimizer:
                 #     else: step, adam_var = self.Adam(step, index+1, adam_var)
                 # else: step, adam_var = self.Adam(step, index+1, adam_var)
             # update conductivity distribution
+            if index % 2 == 1: alpha = 1
+            else: alpha = 0.1
             primal = primal + alpha * step
 
             # Print rms to see overall trend
@@ -161,7 +163,7 @@ class Optimizer:
             file.close()
 
             # # Discriminant
-            criterion = 0.003
+            criterion = 0.00003
             if np.sqrt(np.mean(grad_CST**2)) < criterion: # heuristic (should come up with a more robust criterion)
                 discriminant += 1
                 print(f"rms_grad_CST < {criterion}, optimization process done")
@@ -169,15 +171,15 @@ class Optimizer:
                     end_time = time.time()
                     print(f"{index+2} iterations in total, take time {end_time-start_time}")
                     break
-            elif np.sqrt(np.mean(grad_CST**2)) < 10*criterion: # heuristic
-                if np.dot(last_grad_CST, grad_CST) < 0: 
-                    discriminant += 1
-                    print(f"Discriminant detected, discriminant = {discriminant}")
-                    if discriminant >= 4: # oscillating around extremum
-                        print("Local extremum detected, optimization process done")
-                        end_time = time.time()
-                        print(f"{index+2} iterations in total, take time {end_time-start_time}")
-                        break
+            # elif np.sqrt(np.mean(grad_CST**2)) < 10*criterion: # heuristic
+            #     if np.dot(last_grad_CST, grad_CST) < 0: 
+            #         discriminant += 1
+            #         print(f"Discriminant detected, discriminant = {discriminant}")
+            #         if discriminant >= 4: # oscillating around extremum
+            #             print("Local extremum detected, optimization process done")
+            #             end_time = time.time()
+            #             print(f"{index+2} iterations in total, take time {end_time-start_time}")
+            #             break
             # update radius to make next descent finer
             if filter: radius *= gamma
             else: pass
@@ -467,6 +469,6 @@ if __name__ == "__main__":
     optimizer.specification(amplitudes=[1], frequencies=[2], ratio_bw=[0.1], plot=False)
     initial = optimizer.generate_binary_pixelated_antenna(n=int(L//D), shape='square')
     initial = 0.5 * initial
-    optimizer.gradient_descent(initial, linear_map=False, filter=False, Adam=True)
+    optimizer.gradient_descent(initial, linear_map=False, filter=False, Adam=False)
     
     
