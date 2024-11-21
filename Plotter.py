@@ -93,3 +93,7 @@ class Plotter():
 if __name__ == "__main__":
     plotter = Plotter()
     plotter.plot_all_results(1, False)
+
+    # f = open("macro.txt")
+    # a = f.read()
+    # print(a.split("\n"))
