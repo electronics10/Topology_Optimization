@@ -92,11 +92,13 @@ class Optimizer:
             if linear_map: 
                 primal = np.clip(primal, 0, 1)
                 cond = primal*5.8e7
-            # else: cond = 10**(np.clip(primal, 0, 1) - 4) # original mapping from paper
             else: 
-                if index == 0: primal = 50 * (primal - 0.5*ones) # since default generation is binary but we don't want [0,1] interval
-                primal = np.clip(primal, -25, 25) # otherwise inf, or nan raised (e^21 ~= 1.3e9)
-                cond = 1/(ones + np.exp(-primal))*5.8e7 # 5.8e7*sigmoid(primal)
+                if index == 0: primal = 10 * primal
+                cond = 10**(0.776 * np.clip(primal, 0, 10)) - 1
+            # else: 
+            #     if index == 0: primal = 50 * (primal - 0.5*ones) # since default generation is binary but we don't want [0,1] interval
+            #     primal = np.clip(primal, -25, 25) # otherwise inf, or nan raised (e^21 ~= 1.3e9)
+            #     cond = 1/(ones + np.exp(-primal))*5.8e7 # 5.8e7*sigmoid(primal)
             # apply Gaussian filter
             if filter: cond_smoothed = scimage.gaussian_filter(cond, radius)
             else: cond_smoothed = cond
@@ -136,7 +138,7 @@ class Optimizer:
             else: 
                 # cond_by_primal = 9 * np.log(10) * 10**(9 * primal - 4) # original chain from paper
                 # cond_by_primal = 5.8e7 * np.exp(-primal)/(ones + np.exp(-primal))**2
-                cond_by_primal = 300 * ones
+                cond_by_primal = 10 * ones
             # overall
             grad_primal = grad_cond * cond_by_primal
             step = grad_primal
@@ -462,8 +464,9 @@ if __name__ == "__main__":
 
     # # Optimize any given antenna
     optimizer = Optimizer(set_environment=False)
-    optimizer.specification(amplitudes=[1], frequencies=[2], ratio_bw=[0.1], plot=True)
+    optimizer.specification(amplitudes=[1], frequencies=[2], ratio_bw=[0.1], plot=False)
     initial = optimizer.generate_binary_pixelated_antenna(n=int(L//D), shape='square')
-    optimizer.gradient_descent(initial, linear_map=False, filter=True, Adam=False)
+    initial = 0.5 * initial
+    optimizer.gradient_descent(initial, linear_map=False, filter=False, Adam=True)
     
     
