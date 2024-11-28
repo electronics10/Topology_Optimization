@@ -67,7 +67,7 @@ class Optimizer:
         print("transmitter environment set")
 
     # Optimization core---------------------------------------------------------------------------------
-    def gradient_descent(self, primal, alpha=0.1, gamma=0.9, linear_map=False, filter=True, Adam=True):
+    def gradient_descent(self, primal, alpha=1, gamma=0.9, linear_map=False, filter=True, Adam=True):
         self.clean_results() # clean legacy, otherwise troublesome when plot
         print("Executing gradient ascent:\n")
         '''
@@ -138,7 +138,7 @@ class Optimizer:
             else: 
                 # cond_by_primal = 9 * np.log(10) * 10**(9 * primal - 4) # original chain from paper
                 # cond_by_primal = 5.8e7 * np.exp(-primal)/(ones + np.exp(-primal))**2
-                cond_by_primal = 10 * ones
+                cond_by_primal = ones
             # overall
             grad_primal = grad_cond * cond_by_primal
             step = grad_primal
@@ -149,10 +149,10 @@ class Optimizer:
                 #     else: step, adam_var = self.Adam(step, index+1, adam_var)
                 # else: step, adam_var = self.Adam(step, index+1, adam_var)
             # update conductivity distribution
-            if index % 4 == 0: alpha = 0.1
-            elif index % 4 == 1: alpha = 1
-            elif index % 4 == 2: alpha = 0.7
-            else: alpha = 0.4
+            # if index % 4 == 0: alpha = 0.1
+            # elif index % 4 == 1: alpha = 1
+            # elif index % 4 == 2: alpha = 0.7
+            # else: alpha = 0.4
             primal = primal + alpha * step
 
             # Print rms to see overall trend
@@ -207,8 +207,14 @@ class Optimizer:
         print("Calculating gradient by adjoint method...")
         E_received = self.Efile2gridE(Er_Path)
         E_excited = self.Efile2gridE(Et_Path)
-        print("E_r, E_r[0]:", len(E_received), len(E_received[0]))
-        print("E_e, E_e[0]", len(E_excited), len(E_excited[0]))
+        # Some strange bug from CST (I think it's because of early convergence of time solver)
+        len_r = len(E_received)
+        len_e = len(E_excited)
+        print("E_r, E_r[0]:", len_r, len(E_received[0]))
+        print("E_e, E_e[0]", len_e, len(E_excited[0]))
+        if len_e < len_r: E_received = E_received[:len_e]
+        elif len_r < len_e: E_excited = E_excited[:len_r]
+        else: pass
         grad = np.flip(E_received,0)*E_excited # adjoint method
         grad = -np.sum(grad, axis=0) # adjoint method continued (see paper: "Topology Optimization of Metallic Antenna")
         return grad
@@ -330,6 +336,9 @@ class Optimizer:
             t = np.linspace(0, self.time_end, int(self.time_end/self.time_step)+1)
             # Generate the superposition of Gaussian sine pulses with adjustable bandwidth ratios and amplitudes
             signal = self.gaussian_sine_pulse_multi(amplitudes, frequencies, ratio_bw, t, self.time_end)
+            # Normalize to 1
+            signal = signal/np.max(signal)
+            # Plot signal
             if plot: self.plot_wave_and_spectrum(signal, t, self.time_step)
 
             ## Write excitation file
@@ -468,7 +477,7 @@ if __name__ == "__main__":
 
     # # Optimize any given antenna
     optimizer = Optimizer(set_environment=False)
-    optimizer.specification(amplitudes=[1], frequencies=[2], ratio_bw=[0.1], plot=False)
+    optimizer.specification(amplitudes=[1], frequencies=[2], ratio_bw=[0.1], plot=True, CST_default=False)
     initial = optimizer.generate_binary_pixelated_antenna(n=int(L//D), shape='square')
     initial = 0.5 * initial
     optimizer.gradient_descent(initial, linear_map=False, filter=False, Adam=False)
