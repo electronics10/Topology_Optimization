@@ -67,7 +67,7 @@ class Optimizer:
         print("transmitter environment set")
 
     # Optimization core---------------------------------------------------------------------------------
-    def gradient_descent(self, primal, alpha=1, gamma=0.9, linear_map=False, filter=True, Adam=True):
+    def gradient_descent(self, primal, alpha=0.1, gamma=0.9, linear_map=False, filter=True, Adam=True):
         self.clean_results() # clean legacy, otherwise troublesome when plot
         print("Executing gradient ascent:\n")
         '''
@@ -94,7 +94,8 @@ class Optimizer:
                 cond = primal*5.8e7
             else: 
                 if index == 0: primal = 10 * primal
-                cond = 10**(0.776 * np.clip(primal, 0, 10)) - 1
+                primal = np.clip(primal, 0, 10)
+                cond = 10**(0.776 * primal) - 1
             # else: 
             #     if index == 0: primal = 50 * (primal - 0.5*ones) # since default generation is binary but we don't want [0,1] interval
             #     primal = np.clip(primal, -25, 25) # otherwise inf, or nan raised (e^21 ~= 1.3e9)
