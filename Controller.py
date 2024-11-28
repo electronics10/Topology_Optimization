@@ -281,7 +281,7 @@ class Controller(CSTInterface):
                    f'.SetSubvolume "{self.feedx-1}", "{self.feedx+1}", "{self.feedy-1}", "{self.feedy+1}", "{-5-self.hc-self.hs}", "{self.hc}" ', 
                    '.SetSubvolumeOffset "0.0", "0.0", "0.0", "0.0", "0.0", "0.0" ', 
                    '.SetSubvolumeInflateWithOffset "True" ', '.PlaneNormal "z" ', 
-                   '.PlanePosition "0.035" ', '.Create ', 'End With']
+                   f'.PlanePosition "{self.hc}" ', '.Create ', 'End With']
         command = EonPatch + PonFeed
         command = "\n".join(command)
         self.prj.modeler.add_to_history("set monitor",command)
@@ -386,7 +386,3 @@ class Controller(CSTInterface):
         self.delete_plane_wave() # otherwise CST may raise popup window
         print(f"Return E_Path and powerPath")
         return E_Path, powerPath
-    
-
-
-
