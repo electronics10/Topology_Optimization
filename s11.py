@@ -10,14 +10,15 @@ def data_dict():
         s11 = []
         reader = csv.reader(csvfile, delimiter = ' ')
         for row in reader:
-            if len(row) == 0:
+            data_row = row[0].split(',')
+            if data_row[0] == '':
                 data_dict.append([freq, s11])
                 freq = []
                 s11 = []
             else:   
                 row = row[0].split(',')
-                freq.append(float(row[0]))
-                s11.append(float(row[1]))
+                freq.append(float(data_row[0]))
+                s11.append(float(data_row[1]))
     return np.array(data_dict)
         
 def color_plot(all_data, indices):
