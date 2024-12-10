@@ -1,35 +1,473 @@
+import sys
+sys.path.append(r"C:\Program Files (x86)\CST STUDIO SUITE 2023\AMD64\python_cst_libraries")
+import cst
+import cst.results as cstr
+import cst.interface as csti
 import os
 import time
 import csv
-import Controller as cc
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.ndimage as scimage
 from scipy.fft import fft, fftfreq
 from PIL import Image, ImageDraw, ImageFont
+import matplotlib.colors as colors
+from math import ceil, sqrt
 
 
 # Design parameter
-L = 42
-W = 42
-D = 6
+L = 42 # mm
+W = 42 # mm
+D = 6 # mm
+NX= int(L//D)
+NY = int(W//D)
+TSTEP = 0.1 # default 0.1 ns for 1~3 GHz
+TEND = 3.5 # default duration=3.5 ns for 1~3 GHz
+
+LG = 104
+WG = 104
+HC = 0.035
+HS = 1.6
+FEEDX = 5
+FEEDY = 0
+
+
+class CSTInterface:
+    def __init__(self, fname):
+        self.full_path = os.getcwd() + f"\{fname}"
+        self.opencst()
+
+    def opencst(self):
+        print("CST opening...")
+        allpids = csti.running_design_environments()
+        open = False
+        for pid in allpids:
+            self.de = csti.DesignEnvironment.connect(pid)
+            # self.de.set_quiet_mode(True) # suppress message box
+            print(f"Opening {self.full_path}...")
+            self.prj = self.de.open_project(self.full_path)
+            open = True
+            print(f"{self.full_path} open")
+            break
+        if not open:
+            print("File path not found in current design environment...")
+            print("Opening new design environment...")
+            self.de = csti.DesignEnvironment.new()
+            # self.de.set_quiet_mode(True) # suppress message box
+            self.prj = self.de.open_project(self.full_path)
+            open = True
+            print(f"{self.full_path} open")
+        # I wish to create project if not created, but I don't know how to.
+        # Therefore, the user need to create *.cst file in advance
+
+    def read(self, result_item):
+        results = cstr.ProjectFile(self.full_path, True) #bool: allow interactive
+        try:
+            res = results.get_3d().get_result_item(result_item)
+            res = res.get_data()
+        except:
+            print("No result item. Available result items listed below")
+            print(results.get_3d().get_tree_items())
+            res = None
+        return res
+
+    def save(self):
+        self.prj.modeler.full_history_rebuild() 
+        #update history, might discard changes if not added to history list
+        self.prj.save()
+
+    def close(self):
+        self.de.close()
+
+    def excute_vba(self,  command):
+        command = "\n".join(command)
+        vba = self.prj.schematic
+        res = vba.execute_vba_code(command)
+        return res
+
+    def create_para(self,  para_name, para_value): #create or change are the same
+        command = ['Sub Main', 'StoreDoubleParameter("%s", "%.4f")' % (para_name, para_value),
+                'RebuildOnParametricChange(False, True)', 'End Sub']
+        res = self.excute_vba (command)
+        return command
+    
+    def create_shape(self, index, xmin, xmax, ymin, ymax, hc): #create or change are the same
+        command = ['With Brick', '.Reset ', f'.Name "solid{index}" ', 
+                   '.Component "component2" ', f'.Material "material{index}" ', 
+                   f'.Xrange "{xmin}", "{xmax}" ', f'.Yrange "{ymin}", "{ymax}" ', 
+                   f'.Zrange "0", "{hc}" ', '.Create', 'End With']
+        return command
+        # command = "\n".join(command)
+        # self.prj.modeler.add_to_history(f"solid{index}",command)
+    
+    def create_cond_material(self, index, sigma, type="Lossy metal"): #create or change are the same
+        command = ['With Material', '.Reset ', f'.Name "material{index}"', 
+                #    '.Folder ""', '.Rho "8930"', '.ThermalType "Normal"', 
+                #    '.ThermalConductivity "401"', '.SpecificHeat "390", "J/K/kg"', 
+                #    '.DynamicViscosity "0"', '.UseEmissivity "True"', '.Emissivity "0"', 
+                #    '.MetabolicRate "0.0"', '.VoxelConvection "0.0"', 
+                #    '.BloodFlow "0"', '.MechanicsType "Isotropic"', 
+                #    '.YoungsModulus "120"', '.PoissonsRatio "0.33"', 
+                #    '.ThermalExpansionRate "17"', '.IntrinsicCarrierDensity "0"', 
+                   '.FrqType "all"', f'.Type "{type}"', 
+                   '.MaterialUnit "Frequency", "GHz"', '.MaterialUnit "Geometry", "mm"', 
+                   '.MaterialUnit "Time", "ns"', '.MaterialUnit "Temperature", "Celsius"', 
+                   '.Mu "1"', f'.Sigma "{sigma}"', 
+                   '.LossyMetalSIRoughness "0.0"', '.ReferenceCoordSystem "Global"', 
+                   '.CoordSystemType "Cartesian"', '.NLAnisotropy "False"', 
+                   '.NLAStackingFactor "1"', '.NLADirectionX "1"', '.NLADirectionY "0"', 
+                   '.NLADirectionZ "0"', '.Colour "0", "1", "1" ', '.Wireframe "False" ', 
+                   '.Reflection "False" ', '.Allowoutline "True" ', 
+                   '.Transparentoutline "False" ', '.Transparency "0" ', 
+                   '.Create', 'End With']
+        return command
+        # command = "\n".join(command)
+        # self.prj.modeler.add_to_history(f"material{index}",command)
+
+    def start_simulate(self, plane_wave_excitation=False):
+        try: # problems occur with extreme conditions
+            if plane_wave_excitation:
+                command = ['Sub Main', 'With Solver', 
+                '.StimulationPort "Plane wave"', 'End With', 'End Sub']
+                self.excute_vba(command)
+                print("Plane wave excitation = True")
+            # one actually should not do try-except otherwise severe bug may NOT be detected
+            model = self.prj.modeler
+            model.run_solver()
+        except Exception as e: pass
+    
+    def set_plane_wave(self):  # doesn't update history, disappear after save but remain after simulation
+        command = ['Sub Main', 'With PlaneWave', '.Reset ', 
+                   '.Normal "0", "0", "-1" ', '.EVector "1", "0", "0" ', 
+                   '.Polarization "Linear" ', '.ReferenceFrequency "2" ', 
+                   '.PhaseDifference "-90.0" ', '.CircularDirection "Left" ', 
+                   '.AxialRatio "0.0" ', '.SetUserDecouplingPlane "False" ', 
+                   '.Store', 'End With', 'End Sub']
+        res = self.excute_vba(command)
+        return res
+    
+    def set_excitation(self, filePath): # doesn't update history, disappear after save but remain after simulation. 
+        # set .UseCopyOnly to false otherwise CST read cache
+        command = ['Sub Main', 'With TimeSignal ', '.Reset ', 
+                   '.Name "signal1" ', '.SignalType "Import" ', 
+                   '.ProblemType "High Frequency" ', 
+                   f'.FileName "{filePath}" ', 
+                   '.Id "1"', '.UseCopyOnly "false" ', '.Periodic "False" ', 
+                   '.Create ', '.ExcitationSignalAsReference "signal1", "High Frequency"',
+                   'End With', 'End Sub']
+        res = self.excute_vba(command)
+        return res
+    
+    def delete_plane_wave(self):
+        command = ['Sub Main', 'PlaneWave.Delete', 'End Sub']
+        res = self.excute_vba(command)
+        return res
+    
+    def delete_signal1(self):
+        command = ['Sub Main', 'With TimeSignal', 
+     '.Delete "signal1", "High Frequency" ', 'End With', 'End Sub']
+        res = self.excute_vba(command)
+        return res
+    
+    def set_port(self, point1, point2): # Not a robust piece of code, but anyway
+        command = ['Sub Main', 'Pick.PickEdgeFromId "component1:feed", "1", "1"', 
+                   'Pick.PickEdgeFromId "component1:coaxouter", "1", "1"', 
+                   'With DiscreteFacePort ', '.Reset ', '.PortNumber "1" ', 
+                   '.Type "SParameter"', '.Label ""', '.Folder ""', '.Impedance "50.0"', 
+                   '.VoltageAmplitude "1.0"', '.CurrentAmplitude "1.0"', '.Monitor "True"', 
+                   '.CenterEdge "True"', f'.SetP1 "True", "{point1[0]}", "{point1[1]}", "{point1[2]}"', 
+                   f'.SetP2 "True", "{point2[0]}", "{point2[1]}", "{point2[2]}"', '.LocalCoordinates "False"', 
+                   '.InvertDirection "False"', '.UseProjection "False"', 
+                   '.ReverseProjection "False"', '.FaceType "Linear"', '.Create ', 
+                   'End With', 'End Sub']
+        res = self.excute_vba(command)
+        return res
+    
+    def delete_port(self):
+        command = ['Sub Main', 'Port.Delete "1"', 'End Sub']
+        res = self.excute_vba(command)
+        return res
+    
+    def export_E_field(self, outputPath, resultPath, time_end, time_step, d_step):
+        total_samples = int(time_end/time_step)
+        command = ['Sub Main',
+        'SelectTreeItem  ("%s")' % resultPath, 
+        'With ASCIIExport', '.Reset',
+        f'.FileName ("{outputPath}")',
+        f'.SetSampleRange(0, {total_samples})',
+        '.Mode ("FixedWidth")', f'.Step ({d_step})',
+        '.Execute', 'End With', 'End Sub']
+        res = self.excute_vba(command)
+        return res
+    
+    def export_power(self, outputPath, resultPath, time_end, time_step):
+        total_samples = int(time_end/time_step)
+        command = ['Sub Main',
+        f'SelectTreeItem  ("{resultPath}")', 
+        'With ASCIIExport', '.Reset',
+        f'.FileName ("{outputPath}")',
+        f'.SetSampleRange(0, {total_samples})',
+        '.StepX (4)', '.StepY (4)',
+        '.Execute', 'End With', 'End Sub']
+        res = self.excute_vba(command)
+        return res
+    
+    def delete_results(self):
+        command = ['Sub Main',
+        'DeleteResults', 'End Sub']
+        res = self.excute_vba(command)
+        return res
+ 
+
+class Controller(CSTInterface):
+    def __init__(self, fname):
+        super().__init__(fname)
+        self.Lg = LG
+        self.Wg = WG
+        self.hc = HC
+        self.hs = HS
+        self.feedx = FEEDX
+        self.feedy = FEEDY
+        self.Ld = L
+        self.Wd = W
+        self.d = D
+        self.time_step = TSTEP
+        self.time_end = TEND
+
+
+    # initialize ground, substrate, feed, and port
+    def set_base(self):
+        print("Setting base...")
+        # Create ground, substrate, feed, and port
+        ground = ['Component.New "component1"', 'Component.New "component2"',
+                   'With Brick', '.Reset ', 
+                   '.Name "ground" ', '.Component "component1" ', 
+                   '.Material "Copper (annealed)" ', f'.Xrange "{-self.Lg/2}", "{self.Lg/2}" ', 
+                   f'.Yrange "{-self.Wg/2}", "{self.Wg/2}" ', f'.Zrange "{-self.hc-self.hs}", "{-self.hs}" ', '.Create', 'End With']
+        substrate = ['With Material', '.Reset', '.Name "FR-4 (loss free)"', 
+                   '.Folder ""', '.FrqType "all"', '.Type "Normal"', 
+                   '.SetMaterialUnit "GHz", "mm"', '.Epsilon "4.3"', '.Mu "1.0"', 
+                   '.Kappa "0.0"', '.KappaM "0.0"', 
+                   '.TanDM "0.0"', '.TanDMFreq "0.0"', '.TanDMGiven "False"', 
+                   '.TanDMModel "ConstKappa"', '.DispModelEps "None"', 
+                   '.DispModelMu "None"', '.DispersiveFittingSchemeEps "General 1st"', 
+                   '.DispersiveFittingSchemeMu "General 1st"', 
+                   '.UseGeneralDispersionEps "False"', '.UseGeneralDispersionMu "False"', 
+                   '.Rho "0.0"', '.ThermalType "Normal"', '.ThermalConductivity "0.3"', 
+                   '.SetActiveMaterial "all"', '.Colour "0.94", "0.82", "0.76"', 
+                   '.Wireframe "False"', '.Transparency "0"', '.Create', 'End With',
+                   'With Brick', '.Reset ', '.Name "substrate" ', 
+                   '.Component "component1" ', '.Material "FR-4 (loss free)" ', 
+                   f'.Xrange "{-self.Lg/2}", "{self.Lg/2}" ', f'.Yrange "{-self.Wg/2}", "{self.Wg/2}" ', 
+                   f'.Zrange "{-self.hs}", "0" ', '.Create', 'End With ']
+        ground_sub = ['With Cylinder ', '.Reset ', '.Name "sub" ', '.Component "component1" ', 
+                   '.Material "Copper (annealed)" ', f'.OuterRadius "{self.hs}" ', 
+                   '.InnerRadius "0.0" ', '.Axis "z" ', f'.Zrange "{-self.hc-self.hs}", "{-self.hs}" ', 
+                   f'.Xcenter "{self.feedx}" ', f'.Ycenter "{self.feedy}" ', '.Segments "0" ', '.Create ', 
+                   'End With', 'Solid.Subtract "component1:ground", "component1:sub"']
+        substrate_sub = ['With Cylinder ', '.Reset ', '.Name "feedsub" ', 
+                   '.Component "component1" ', '.Material "FR-4 (loss free)" ', 
+                   f'.OuterRadius "{self.hs/2-0.1}" ', '.InnerRadius "0.0" ', '.Axis "z" ', 
+                   f'.Zrange "{-self.hs}", "0" ', f'.Xcenter "{self.feedx}" ', f'.Ycenter "{self.feedy}" ', 
+                   '.Segments "0" ', '.Create ', 'End With', 
+                   'Solid.Subtract "component1:substrate", "component1:feedsub"'] 
+        feed = ['With Cylinder ', '.Reset ', '.Name "feed" ', '.Component "component1" ', 
+                   '.Material "PEC" ', f'.OuterRadius "{self.hs/2-0.1}" ', '.InnerRadius "0.0" ', 
+                   '.Axis "z" ', f'.Zrange "{-5-self.hc-self.hs}", "{self.hc}" ', f'.Xcenter "{self.feedx}" ', 
+                   f'.Ycenter "{self.feedy}" ', '.Segments "0" ', '.Create ', 'End With']
+        coax = ['With Cylinder ', '.Reset ', '.Name "coax" ', '.Component "component1" ', 
+                   '.Material "Vacuum" ', f'.OuterRadius "{self.hs-0.01}" ', f'.InnerRadius "{self.hs/2-0.1}" ', 
+                   '.Axis "z" ', f'.Zrange "{-5-self.hc-self.hs}", "{-self.hc-self.hs}" ', f'.Xcenter "{self.feedx}" ', 
+                   f'.Ycenter "{self.feedy}" ', '.Segments "0" ', '.Create ', 'End With', 
+                   'With Cylinder ', '.Reset ', '.Name "coaxouter" ', 
+                   '.Component "component1" ', '.Material "PEC" ', f'.OuterRadius "{self.hs}" ', 
+                   f'.InnerRadius "{self.hs-0.01}" ', '.Axis "z" ', f'.Zrange "{-5-self.hc-self.hs}", "{-self.hc-self.hs}" ', 
+                   f'.Xcenter "{self.feedx}" ', f'.Ycenter "{self.feedy}" ', '.Segments "0" ', '.Create ', 
+                   'End With']
+        command = ground + substrate + ground_sub + substrate_sub + feed + coax
+        command = "\n".join(command)
+        self.prj.modeler.add_to_history("initialize",command)
+        self.save()
+        print("Base set")
+    
+    def set_monitor(self):
+        print("Setting monitor...")
+        margin = (self.Ld - self.d)/2
+        # Set monitor to read E field on domain
+        EonPatch = ['With Monitor ', '.Reset ', '.Name "E_field_on_patch" ', 
+                   '.Dimension "Volume" ', '.Domain "Time" ', '.FieldType "Efield" ', 
+                   '.Tstart "0" ', f'.Tstep "{self.time_step}" ', f'.Tend "{self.time_end}" ', '.UseTend "True" ', 
+                   '.UseSubvolume "True" ', '.Coordinates "Free" ', 
+                   f'.SetSubvolume "0", "0", "0", "0", "{-5-self.hc-self.hs}", "{self.hc}" ', 
+                   f'.SetSubvolumeOffset "{margin}", "{margin}", "{margin}", "{margin}", "{margin}", "{margin}" ', 
+                   '.SetSubvolumeInflateWithOffset "True" ', '.PlaneNormal "z" ', 
+                   f'.PlanePosition "{self.hc}" ', '.Create ', 'End With']
+        # Set monitor to read power at feed
+        PonFeed = ['With Monitor ', 
+                   '.Reset ', '.Name "power_on_feed" ', '.Dimension "Volume" ', 
+                   '.Domain "Time" ', '.FieldType "Powerflow" ', 
+                   '.Tstart "0" ', f'.Tstep "{self.time_step}" ', f'.Tend "{self.time_end}" ', 
+                   '.UseTend "True" ', '.UseSubvolume "True" ', '.Coordinates "Free" ', 
+                   f'.SetSubvolume "{self.feedx-1}", "{self.feedx+1}", "{self.feedy-1}", "{self.feedy+1}", "{-5-self.hc-self.hs}", "{self.hc}" ', 
+                   '.SetSubvolumeOffset "0.0", "0.0", "0.0", "0.0", "0.0", "0.0" ', 
+                   '.SetSubvolumeInflateWithOffset "True" ', '.PlaneNormal "z" ', 
+                   f'.PlanePosition "{self.hc}" ', '.Create ', 'End With']
+        # command = EonPatch + PonFeed
+        command = EonPatch
+        command = "\n".join(command)
+        self.prj.modeler.add_to_history("set monitor",command)
+        self.save()
+        print("Monitor set")
+
+    def set_domain(self): 
+        print("Setting domain...")
+        # Initialize domain with uniform conductivity
+        nx, ny = (int(self.Ld//self.d), int(self.Wd//self.d))
+        cond = np.zeros(nx*ny)
+        print(f"{nx*ny} pixels in total...")
+        # Define materials first
+        self.update_distribution(cond)
+        command = []
+        # Define shape and index based on materials
+        for index, sigma in enumerate(cond): 
+            midpoint = (self.Ld/2, self.Wd/2)
+            xi = index%nx
+            yi = index//nx
+            xmin = xi*self.d-midpoint[0]
+            xmax = xmin+self.d
+            ymin = yi*self.d-midpoint[1]
+            ymax = ymin+self.d
+            command += self.create_shape(index, xmin, xmax, ymin, ymax, self.hc)
+        command = "\n".join(command)
+        self.prj.modeler.add_to_history("domain",command)
+        self.save()
+        print("Domain set")
+
+    def update_distribution(self, cond):
+        print("Conductivity distribution updating...")
+        command_material = []
+        for index, sigma in enumerate(cond):
+            if sigma < 9000: command_material += self.create_cond_material(index, sigma, "Normal")
+            else: command_material += self.create_cond_material(index, sigma)
+        command_material = "\n".join(command_material)
+        self.prj.modeler.add_to_history("material update",command_material)
+        print("Conductivity distribution updated")
+
+    def feed_excitation(self, feedPath):
+        print("Start feed exciation")
+        # Import feed file
+        print("fe: importing feed file")
+        feedPath = os.getcwd() + "\\" + feedPath # getcwd so CST don't load cache
+        self.set_excitation(feedPath)
+        # Start simulation with feed
+        print("fe: simulating")
+        point1 = (self.feedx+self.hs/2-0.1, self.feedy, -5-self.hc-self.hs)
+        point2 = (self.feedx+self.hs, self.feedy, -5-self.hc-self.hs)
+        self.set_port(point1, point2)
+        self.start_simulate()
+        # Export E field on patch to txt
+        E_Path = "txtf\E_excited.txt"
+        outputPath = os.getcwd() + "\\" + E_Path
+        self.export_E_field(outputPath, "2D/3D Results\\E-Field\\E_field_on_patch [1]", self.time_end, self.time_step, self.d)
+        print(f"fe: electric field exported as {outputPath}")
+        # # Record s11 to s11.csv
+        # s11 = self.read('1D Results\\S-Parameters\\S1,1')
+        # with open('results\\s11.csv', 'a', newline='') as csvfile:
+        #     writer = csv.writer(csvfile)
+        #     for line in s11: # [[freq, s11, 50+j],...]
+        #         line = np.abs(line) # change s11 from complex to absolute
+        #         line[1] = 20*np.log10(line[1]) # convert to dB
+        #         writer.writerow(line[:-1])
+        #     writer.writerow([]) # space line for seperation from next call
+        # Record Tx_input_signal to Tx_input_signal.csv
+        Tx_input_signal = self.read('1D Results\\Port signals\\i1')
+        with open('results\\Tx_input_signal.csv', 'a', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            for line in Tx_input_signal: # [(time, signal_value),...]
+                writer.writerow(line)
+            writer.writerow([]) # space line for seperation from next call
+        # Record Tx_reflected_signal to Tx_reflected_signal.csv
+        Tx_reflected_signal = self.read('1D Results\\Port signals\\o1,1')
+        with open('results\\Tx_reflected_signal.csv', 'a', newline='') as csvfile2:
+            writer2 = csv.writer(csvfile2)
+            for line in Tx_reflected_signal: # [(time, signal_value),...]
+                writer2.writerow(line)
+            writer2.writerow([]) # space line for seperation from next call
+        # Must delete before return, otherwise CST will save and raise popup window in next iteration
+        self.delete_results() # otherwise CST may raise popup window
+        self.delete_signal1() # otherwise CST may raise popup window
+        self.delete_port() # otherwise CST may raise popup window
+        print(f"Return E_Path")
+        return E_Path
+
+    def plane_wave_excitation(self, excitePath=None):
+        print("Start plane wave excitation")
+        # Import excitation file
+        if excitePath: 
+            print("pw: importing specified excitation file")
+            excitePath = os.getcwd() + "\\" + excitePath # getcwd so CST don't load cache
+            self.set_excitation(excitePath)
+        ## Start simulation with plane wave
+        print("pw: simulating")
+        point1 = (self.feedx+self.hs/2-0.1, self.feedy, -5-self.hc-self.hs)
+        point2 = (self.feedx+self.hs, self.feedy, -5-self.hc-self.hs)
+        self.set_port(point1, point2)
+        self.set_plane_wave()
+        self.start_simulate(plane_wave_excitation=True)
+        ## Export E field on patch to txt
+        E_Path = "txtf\E_received.txt"
+        outputPath = os.getcwd() + "\\" + E_Path
+        self.export_E_field(outputPath, "2D/3D Results\\E-Field\\E_field_on_patch [pw]", self.time_end, self.time_step, self.d)
+        print(f"pw: electric field exported as {outputPath}")
+        ## Legacy-----------------------------------
+        # # Return power on feed, must set Result Template on CST by hand in advance (IDK how to do it by code)
+        # print("pw: return power on feed")
+        # power = self.read("Tables\\1D Results\\power_on_feed (pw)_Abs_0D")
+        # self.save() ------------------------------
+        ## Legacy 2
+        # Export Power Flow to txt
+        # powerPath = "txtf\power.txt"
+        # outputPath = os.getcwd() + "\\" + powerPath 
+        # self.export_power(outputPath, "2D/3D Results\\Power Flow\\power_on_feed [pw]", self.time_end, self.time_step)
+        # print(f"pw: power flow exported as {outputPath}")
+        power_data = self.read('1D Results\\Port signals\\o1 [pw]')
+        powerPath = "txtf\power.txt"
+        file = open(powerPath, "w")
+        file.write("#\n#'Time / ns'	'default [Real Part]'\n#---------------------------------\n") # IDK why but don't change a word
+        for row in power_data:
+            file.write(f"{row[0]} {row[1]}\n")
+        file.close()
+        # Record Rx_signal to Rx_signal.csv
+        Rx_signal = self.read('1D Results\\Port signals\\o1 [pw]')
+        with open('results\\Rx_signal.csv', 'a', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            for line in Rx_signal: # [(time, signal_value),...]
+                writer.writerow(line)
+            writer.writerow([]) # space line for seperation from next call
+        ## Must delete before return, otherwise CST will save and raise popup window in next iteration
+        self.delete_results() # otherwise CST may raise popup window
+        self.delete_port() # otherwise CST may raise popup window
+        self.delete_plane_wave() # otherwise CST may raise popup window
+        print(f"Return E_Path and powerPath")
+        return E_Path, powerPath
 
 
 # Optimizer Class
 class Optimizer:
-    def __init__(self, set_environment=False):
+    def __init__(self, receiver = None, transmitter = None, set_environment=False):
         # Operating domain
         self.Ld = L
         self.Wd = W
         self.d = D
-        self.nx = int(self.Ld//self.d)
-        self.ny = int(self.Wd//self.d)
-        self.time_step = 0.1 # default 0.1 ns for 1~3 GHz
-        self.time_end = 3.5 # default duration=3.5 ns for 1~3 GHz
+        self.nx = NX
+        self.ny = NY
+        self.time_step = TSTEP
+        self.time_end = TEND
         self.excitePath = None # use CST default excitation for 1~3 GHz
+        self.excitation_power = 1 # use CST default excitation for 1~3 GHz
         # initiate controller (receiver and transmitter pair)
-        self.receiver = cc.Controller("CST_Antennas/receiver.cst")
-        self.transmitter = cc.Controller("CST_Antennas/transmitter.cst")
+        self.receiver = receiver
+        self.transmitter = transmitter
         if set_environment: self.set_environment()
         # self.update_controller()
         # not important
@@ -39,20 +477,6 @@ class Optimizer:
             'grad_CST':"results\\grad_CST_history.txt",
             'step':"results\\step_history.txt"
             }
-        
-    def update_controller(self):
-        self.receiver.Ld = self.Ld
-        self.receiver.Wd = self.Wd
-        self.receiver.d = self.d
-        self.receiver.time_step = self.time_step
-        self.receiver.time_end = self.time_end
-        self.receiver.set_monitor()
-        self.transmitter.Ld = self.Ld
-        self.transmitter.Wd = self.Wd
-        self.transmitter.d = self.d
-        self.transmitter.time_step = self.time_step
-        self.transmitter.time_end = self.time_end
-        self.transmitter.set_monitor()
 
     def set_environment(self):
         # Set base and domain for receiver
@@ -67,7 +491,7 @@ class Optimizer:
         print("transmitter environment set")
 
     # Optimization core---------------------------------------------------------------------------------
-    def gradient_descent(self, primal, alpha=0.1, gamma=0.9, linear_map=False, filter=True, Adam=True):
+    def gradient_ascent(self, primal, alpha=0.5, gamma=0.9, iterations = 80, linear_map=False, filter=True, Adam=True):
         self.clean_results() # clean legacy, otherwise troublesome when plot
         print("Executing gradient ascent:\n")
         '''
@@ -77,7 +501,6 @@ class Optimizer:
         3. linear_map means linear or nonlinear conductivity mapping from [0,1] to actual conductivity
         '''
         discriminant = 0 # convergence detector
-        iterations = 80 # maximum iterations if doesn't converge
         radius = self.nx/4 # radius for gaussian filter
         last_grad_CST = np.zeros(self.nx*self.ny) # Initial grad_CST of descent
         adam_var = np.array([np.zeros(self.nx*self.ny), np.zeros(self.nx*self.ny),\
@@ -85,18 +508,17 @@ class Optimizer:
         ones = np.ones(self.nx*self.ny)
         # Gradient ascent loop
         start_time = time.time()
-        for index in range(iterations):
+        for index in range(iterations): # maximum iterations if doesn't converge
             print(f"Iteration{index}:")
             # # Map and calculate gradient
             # map unit to full
             if linear_map: 
                 primal = np.clip(primal, 0, 1)
                 cond = primal*5.8e7
-            else: 
-                if index == 0: primal = 10 * primal
-                primal = np.clip(primal, 0, 10)
-                cond = 10**(0.776 * primal) - 1
-            # else: 
+            else: # log
+                primal = np.clip(primal, 0, 1)
+                cond = 10**(7.76 * primal) - 1
+            # else: # sigmoid
             #     if index == 0: primal = 50 * (primal - 0.5*ones) # since default generation is binary but we don't want [0,1] interval
             #     primal = np.clip(primal, -25, 25) # otherwise inf, or nan raised (e^21 ~= 1.3e9)
             #     cond = 1/(ones + np.exp(-primal))*5.8e7 # 5.8e7*sigmoid(primal)
@@ -135,11 +557,11 @@ class Optimizer:
             # second chain
             if linear_map: 
                 # cond_by_primal = 5.8e7 * ones # linear case
-                cond_by_primal = 10 * ones # won't converge adjustment
+                cond_by_primal = 100 * ones # won't converge adjustment
             else: 
-                # cond_by_primal = 9 * np.log(10) * 10**(9 * primal - 4) # original chain from paper
-                # cond_by_primal = 5.8e7 * np.exp(-primal)/(ones + np.exp(-primal))**2
-                cond_by_primal = ones
+                # cond_by_primal = 7.76 * np.log(10) * 10**(7.76 * primal) * 0.1**4 # log (0.1^4 because time and volume differential)
+                # cond_by_primal = 5.8e7 * np.exp(-primal)/(ones + np.exp(-primal))**2 * 0.1**4 # sigmoid (0.1^4 because time and volume differential)
+                cond_by_primal = ones * 100 # won't converge adjustment
             # overall
             grad_primal = grad_cond * cond_by_primal
             step = grad_primal
@@ -227,19 +649,30 @@ class Optimizer:
         file = open(powerPath,'r')
         power_array = []
         total_power = 0 # record total power for overall validation
-        t = 0.0
-        for line in file.readlines()[2:]: # First two lines are titles
-            if line.startswith('Sample'): pass
-            else:
-                line = line.split() # x,y,z,Px,Py,Pz
-                time = []
-                time.append(t)
-                poynting_z = float(line[5])
-                time.append(poynting_z)
-                power_array.append(time)
-                t += self.time_step
-                total_power += np.abs(poynting_z) # sum up Sz during an impulse of time
+        # Legacy
+        # t = 0.0
+        # for line in file.readlines()[2:]: # First two lines are titles
+        #     if line.startswith('Sample'): pass
+        #     else:
+        #         line = line.split() # x,y,z,Px,Py,Pz
+        #         time = []
+        #         time.append(t)
+        #         poynting_z = float(line[5])
+        #         time.append(poynting_z)
+        #         power_array.append(time)
+        #         t += self.time_step
+        #         total_power += np.abs(poynting_z) # sum up Sz during an impulse of time
+        last_time = 0.0
+        for line in file.readlines()[3:]: # First three lines are titles
+            line = line.split() # time, value
+            current_time = float(line[0])
+            current_value = float(line[1])
+            power_array.append([current_time, current_value])
+            # integration
+            total_power += np.abs(current_value) * (current_time - last_time)
+            last_time = current_time
         file.close()
+        total_power = total_power/self.excitation_power # normalize
         '''-------------------------------------------------
         Record received power while doing power_time_reverse for calculating gradient,
         otherwise lose the information since we don't have exact objective function.
@@ -309,51 +742,104 @@ class Optimizer:
         return step, adam_var
     
     # Excitation control for antenna design--------------------------------------------------------------------
-    def specification(self, amplitudes=[1, 1], frequencies=[1.5, 2.4], ratio_bw=[0.18, 0.1], plot=True, CST_default=False):
-        if CST_default: pass
+    def specification(self, spec_dic=None, set_monitor=True):
+        if spec_dic == None: pass
         else:
-            print("customizing specification")
-            '''
-            - amplitudes: [Amplitudes] for each frequency component
-            - frequecies: Multiple [frequencies] in GHz [2.4, 3.6, 5.1]
-            - ratio_bw: Bandwidth-to-frequency [ratios] [0.1, 0.02, 0.5]
-            Time unit in nanoseconds (ns).
-            '''
-            max_freq = max(frequencies)
-            ## Make sure time step has no more than n digits, e.g. resolution=0.01 ns
-            if max_freq < 2.5: self.time_step = np.around(1/(4 * max_freq), 1)
-            elif max_freq < 25: self.time_step = np.around(1/(4 * max_freq), 2)
-            elif max_freq < 500: self.time_step = np.around(1/(2 * max_freq), 3)
-            else: 
-                print("Input frequency too high")
-                return None
-            
-            ## Calculate signal waveform
-            # Automatically determine the duration based on the widest Gaussian pulse width
-            max_sigma = max([1 / (2 * np.pi * freq * ratio) for freq, ratio in zip(frequencies, ratio_bw)])
-            self.time_end = 8 * max_sigma  # Duration of the pulse (6 sigma captures ~99.7% of energy)
-            self.time_end = int(self.time_end) 
-            # Time array shifted to start from 0 to self.time_end in nanoseconds (ns)
-            t = np.linspace(0, self.time_end, int(self.time_end/self.time_step)+1)
-            # Generate the superposition of Gaussian sine pulses with adjustable bandwidth ratios and amplitudes
-            signal = self.gaussian_sine_pulse_multi(amplitudes, frequencies, ratio_bw, t, self.time_end)
-            # Normalize to 1
-            signal = signal/np.max(signal)
-            # Plot signal
-            if plot: self.plot_wave_and_spectrum(signal, t, self.time_step)
+            self.time_end = spec_dic["time_end"]
+            self.time_step = spec_dic["time_step"]
+            self.excitePath = spec_dic["excitePath"]
+            self.excitation_power = spec_dic["power"]
+            ## Reset impulse time informtion for controller
+            self.receiver.time_step = self.time_step
+            self.receiver.time_end = self.time_end
+            self.transmitter.time_step = self.time_step
+            self.transmitter.time_end = self.time_end
+        # Set monitor
+        if set_monitor:
+            print("Setting monitor for receiver")
+            self.receiver.set_monitor()
+            print("Setting monitor for transmitter")
+            self.transmitter.set_monitor()
+        else: print("Specification: Use monitor from last history entry, make sure same time interval are used.")
 
-            ## Write excitation file
-            self.excitePath = "txtf\excitation.txt"
-            file = open(self.excitePath, "w")
-            file.write("#\n#'Time / ns'	'default [Real Part]'\n#---------------------------------\n") # IDK why but don't change a word
-            for index, value in enumerate(signal):
-                file.write(f"{t[index]} {value}\n")
-            file.close()
+    # just for convenience-------------------------------------------------------------------------
+    def clean_results(self):
+        print("Cleaning result legacy...")
+        folder = os.getcwd() + "/results"
+        for file in os.listdir(folder): 
+            file = folder + "/" + file
+            os.remove(file)
+        print("All files deleted successfully.")
 
-        ## Reset monitor and impulse time informtion for controller
-        self.update_controller()
 
-    def gaussian_sine_pulse_multi(self, amplitudes, frequencies, ratios, t, duration):
+# Excitation signal generator
+class Excitation_Generator:
+    def __init__(self, amplitudes=[1, 1], frequencies=[1.5, 2.4], ratio_bw=[0.18, 0.1]):
+        self.resolution = 10
+        self.amplitudes = amplitudes
+        self.frequencies = frequencies
+        self.ratio_bw = ratio_bw
+        self.time_end = None
+        self.time_step = None
+        self.excitePath = None
+        self.t = None
+        self.signal = None
+        self.power = 0
+        self.spec_dic = None
+
+    def generate(self):
+        print("customizing specification")
+        '''
+        - amplitudes: [Amplitudes] for each frequency component
+        - frequecies: Multiple [frequencies] in GHz [2.4, 3.6, 5.1]
+        - ratio_bw: Bandwidth-to-frequency [ratios] [0.1, 0.02, 0.5]
+        Time unit in nanoseconds (ns).
+        '''
+        max_freq = max(self.frequencies)
+        ## Make sure time step has no more than n digits, e.g. resolution=0.01 ns
+        if max_freq < 2.5: self.time_step = np.around(1/(4 * max_freq), 1)
+        elif max_freq < 25: self.time_step = np.around(1/(4 * max_freq), 2)
+        elif max_freq < 500: self.time_step = np.around(1/(2 * max_freq), 3)
+        else: 
+            print("Input frequency too high")
+            return None
+        
+        ## Calculate signal waveform
+        # Automatically determine the duration based on the widest Gaussian pulse width
+        max_sigma = max([1 / (2 * np.pi * freq * ratio) for freq, ratio in zip(self.frequencies, self.ratio_bw)])
+        self.time_end = 8 * max_sigma  # Duration of the pulse (6 sigma captures ~99.7% of energy)
+        self.time_end = int(self.time_end) 
+        # Time array shifted to start from 0 to self.time_end in nanoseconds (ns)
+        self.t = np.linspace(0, self.time_end, int(self.time_end/(self.time_step/self.resolution))+1)
+        # Generate the superposition of Gaussian sine pulses with adjustable bandwidth ratios and amplitudes
+        self.signal = self.gaussian_sine_pulse_multi()
+        # Normalize to 1
+        self.signal = self.signal/np.max(self.signal)
+
+        ## Write excitation file
+        self.excitePath = "txtf\excitation.txt"
+        file = open(self.excitePath, "w")
+        file.write("#\n#'Time / ns'	'default [Real Part]'\n#---------------------------------\n") # IDK why but don't change a word
+        for index, value in enumerate(self.signal):
+            file.write(f"{self.t[index]} {value}\n")
+        file.close()
+
+        ## Calculate total power the signal carries
+        last_time = 0.0
+        for index, current_time in enumerate(self.t):
+            current_value = self.signal[index]
+            # integration
+            self.power += np.abs(current_value) * (current_time - last_time) # power^1/2 actually 
+            last_time = current_time 
+         
+        ## Update spec_dictionary
+        self.spec_dic = {
+            "time_end" : self.time_end,
+            "time_step" : self.time_step,
+            "excitePath" : self.excitePath,
+            "power" : self.power}
+
+    def gaussian_sine_pulse_multi(self):
         """
         Parameters:
         - amplitudes: List or array of amplitudes for each frequency component.
@@ -361,31 +847,32 @@ class Optimizer:
         - ratios: List or array of bandwidth-to-frequency ratios.
         - t: Time array in nanoseconds (ns).
         """
-        signal = np.zeros_like(t)
+        signal = np.zeros_like(self.t)
         # Superpose the Gaussian sine waves for each frequency
-        for i, freq in enumerate(frequencies):
-            sigma = 1 / (2 * np.pi * freq * ratios[i])
-            sine_wave = np.sin(2 * np.pi * freq * (t-duration/2))
-            gaussian_envelope = amplitudes[i] * freq * ratios[i] * np.exp((-(t-duration/2)**2) / (2 * (sigma**2)))
+        for i, freq in enumerate(self.frequencies):
+            sigma = 1 / (2 * np.pi * freq * self.ratio_bw[i])
+            sine_wave = np.sin(2 * np.pi * freq * (self.t-self.time_end/2))
+            gaussian_envelope = self.amplitudes[i] * freq * self.ratio_bw[i] * \
+            np.exp((-(self.t-self.time_end/2)**2) / (2 * (sigma**2)))
             signal += gaussian_envelope * sine_wave
         return signal
 
-    def plot_wave_and_spectrum(self, signal, t, time_step):
+    def plot_wave_and_spectrum(self):
         # Time-domain waveform plot
         plt.figure()
-        plt.plot(t, signal)
+        plt.plot(self.t, self.signal)
         plt.title('Excitation Signal')
         plt.xlabel('Time (ns)')
         plt.ylabel('Amplitude')
         plt.grid(True)
         plt.show()
         # Frequency spectrum plot
-        length = len(signal)
-        fft_signal = fft(signal)
-        fft_freq = fftfreq(length, time_step)
+        length = len(self.signal)
+        fft_signal = fft(self.signal)
+        fft_freq = fftfreq(length, (self.time_step/self.resolution))
         # Only take the positive half of the frequencies (real frequencies)
-        positive_freqs = fft_freq[:length // 2]
-        magnitude_spectrum = np.abs(fft_signal[:length // 2])
+        positive_freqs = fft_freq[:length // (2*self.resolution)]
+        magnitude_spectrum = np.abs(fft_signal[:length // (2*self.resolution)])
         # Plot the energy spectrum
         plt.figure()
         plt.plot(positive_freqs, magnitude_spectrum**2)
@@ -395,92 +882,134 @@ class Optimizer:
         plt.grid(True)
         plt.show()
 
-    # just for convenience-------------------------------------------------------------------------
-    def clean_results(self):
-        print("Cleaning result legacy...")
-        for result_path in self.results_history_path.values():
-            if os.path.exists(result_path): os.remove(result_path)
-        # Clean Adam.txt
-        if os.path.exists("results\\Adam.txt"): os.remove("results\\Adam.txt")
-        # Clean total_power.csv
-        if os.path.exists("results\\total_power.csv"): os.remove("results\\total_power.csv")
-        # Clean s11.csv (Not good, optimizer shouldn't know the path of s11. but anyway)
-        if os.path.exists("results\\s11.csv"): os.remove("results\\s11.csv")
-        print("All files deleted successfully.")
-    
-    # Some interesting initial antenna generator (not important) -------------------------------------------------------
-    def generate_binary_pixelated_antenna(self, n, shape, **kwargs):
-        print("Generating initial antenna...")
-        shape = self.generate_shape(n, shape, **kwargs)
-        # initial = self.add_noise(shape.ravel())
-        initial = shape.ravel()
-        print("Initial antenna generated")
-        return initial
+# results plotting functions
+class Plotter():
+    def __init__(self):
+        self.Ld = L
+        self.Wd = W
+        self.d = D
+        self.nx = NX
+        self.ny = NY
+        self.results_history_path = {
+            'cond':"results\\cond_smoothed_history.txt", 
+            'primal':"results\\primal_history.txt",
+            'grad_CST':"results\\grad_CST_history.txt",
+            'step':"results\\step_history.txt"
+            }
+        
+    def plot_distribution(self, file_path, true_position=True, start=0, end=1):
+        print("Plotting distribution history...")
+        # txt to array (iterations of distribution)
+        array_1D = self.parse_iteration_blocks(file_path)
+        num_plots = len(array_1D)
+        if start > end:
+            print("Error: start > end")
+            return None
+        else: array_1D = array_1D[int(num_plots*start):int(num_plots*end)]
+        array_1D = np.array(array_1D)
+        # Plot figure
+        # Determine grid size for subplots
+        num_plots = len(array_1D)
+        if num_plots == 0: 
+            print("Array length = 0")
+            return None
+        cols = ceil(sqrt(num_plots))
+        rows = ceil(num_plots / cols)
+        # Create figure and subplots
+        fig, axes = plt.subplots(rows, cols)
+        fig.suptitle(file_path)
+        axes = axes.flatten()  # Flatten the axes array for easy iteration
+        # 1d to 2d (core)
+        print("Creating figures...")
+        if true_position:
+            mid = (self.Ld/2, self.Wd/2)
+            for index, distribution_1D in enumerate(array_1D):
+                im = axes[index].imshow(distribution_1D.reshape(self.nx, self.ny), \
+                                        extent=[-mid[0], self.Ld-mid[0], -mid[1], self.Wd-mid[1]], \
+                                        norm=colors.CenteredNorm(), cmap='coolwarm')
+                # axes[index].set_title(f'Iteration {index}')
+        else:
+            for index, distribution_1D in enumerate(array_1D):
+                im = axes[index].imshow(distribution_1D.reshape(self.nx, self.ny), \
+                    origin='upper', norm=colors.CenteredNorm(), cmap= 'coolwarm') #'gray_r', 'copper'
+                axes[index].axis('off') # 'off' Hide axis for better visualization
+        fig.colorbar(im, ax = axes[-1], fraction=0.1)
+        # Remove any empty subplots
+        for j in range(index + 1, len(axes)):
+            fig.delaxes(axes[j])
+        # plt.tight_layout()
+        print("Figures created")
 
-    def generate_shape(self, n, shape, **kwargs):
-        array = np.zeros((n, n), dtype=np.int32)
-        if shape == 'circle':
-            print("generating circle")
-            radius = kwargs.get('radius', n//3)
-            center = kwargs.get('center', (n // 2, n // 2))
-            y, x = np.ogrid[:n, :n]
-            dist_from_center = np.sqrt((x - center[0])**2 + (y - center[1])**2)
-            array[dist_from_center <= radius] = 1
-        elif shape == 'square': array = np.ones(n*n).reshape(n,-1)
-        elif shape == 'rectangle':
-            horizontal = np.ones(n)
-            array = []
-            for i in range(n):
-                if i < n//3: horizontal[i]=0
-                elif i > 2*n//3: horizontal[i]=0
-            for i in range (n): array.append(horizontal)
-            array = np.array(array)
-        elif shape == 'alphabet':
-            print("generatine alphabet")
-            letter = kwargs.get('letter', 'F')
-            font_size = kwargs.get('font_size', 8)
-            array = self.generate_alphabet(letter, n, font_size)
-        return array
+    def parse_iteration_blocks(self, file_path):
+        print(f"Parsing iteration history of {file_path}...")
+        with open(file_path, 'r') as file:
+            content = file.read().strip()  # Read the content and strip any extra whitespace
+        iteration_blocks = content.split('Iteration')[1:]  # Split by 'Iteration' and ignore the first empty element
+        result = []
+        for block in iteration_blocks:
+            block = block.strip()  # Strip any leading/trailing whitespace
+            block_content = block.split('\n', 1)[1]  # Skip the '0', '1', etc., and get the rest of the content
+            block_content = block_content.replace('\n', ' ')  # Replace newline characters with spaces
+            block_content = block_content.replace('[', '').replace(']', '')  # Remove square brackets
+            number_strings = block_content.split()  # Split the content by spaces
+            numbers = [float(num) for num in number_strings]  # Convert the strings to integers
+            result.append(numbers)
+        print("Done, return array.")
+        return result
 
-    def generate_alphabet(self, letter, n, font_size):
-        print(f"generating letter {letter}")
-        # Create a blank image with a white background
-        img = Image.new('L', (n, n), 0)  # 'L' mode for grayscale, initialized with black (0)
-        draw = ImageDraw.Draw(img)
-        # Load a default font
-        try:
-            font = ImageFont.truetype("arial.ttf", font_size)  # You can replace this with any valid font path
-        except:
-            font = ImageFont.load_default()
-        # Get the bounding box of the letter
-        bbox = draw.textbbox((0, 0), letter, font=font)
-        text_width, text_height = bbox[2] - bbox[0], bbox[3] - bbox[1]
-        # Calculate the position to center the letter
-        position = (n // 2 - text_width//1.8  , n // 2 - text_height//1.2)
-        # Draw the letter on the image
-        draw.text(position, letter, fill=1, font=font)
-        # Convert the image to a NumPy array (1 for white, 0 for black)
-        array = np.array(img)
-        return array
+    def plot_all_results(self, batch=3, true_position=False):
+        for path in self.results_history_path.values():
+            for index in range(batch):
+                self.plot_distribution(path, true_position, start=index/batch, end=(index+1)/batch)
+                plt.show()
 
-    def add_noise(self, binary_array, dB=0):
-        print(f"adding noise with {dB}dB")
-        length = len(binary_array)
-        noise1 = np.random.rand(length)*0.00001*10**dB # 0.00001 because 5.8e7 scale is too large
-        noise2 = np.random.rand(length)*0.00001*10**dB # 0.00001 because 5.8e7 scale is too large
-        binary_array = binary_array + noise1 - noise2
-        binary_array = np.clip(binary_array, 0, 1)
-        return binary_array
+# Some interesting initial antenna generator
+def generate_shape(shape):
+    array = np.zeros((NX, NY), dtype=np.int32)
+    if shape == 'circle':
+        print("generating circle")
+        radius = min(NX, NY)//3
+        center = (NX // 2, NY // 2)
+        y, x = np.ogrid[:NX, :NX]
+        dist_from_center = np.sqrt((x - center[0])**2 + (y - center[1])**2)
+        array[dist_from_center <= radius] = 1
+    elif shape == 'square': array = np.ones(NX*NY).reshape(NX,-1)
+    elif shape == 'rectangle':
+        horizontal = np.ones(NX)
+        array = []
+        for i in range(NX):
+            if i < NX//3: horizontal[i]=0
+            elif i > 2*NX//3: horizontal[i]=0
+        for i in range (NY): array.append(horizontal)
+        array = np.array(array)
+    return array
 
+def generate_alphabet(letter, font_size=8):
+    print(f"generating letter {letter}")
+    # Create a blank image with a white background
+    img = Image.new('L', (NX, NY), 0)  # 'L' mode for grayscale, initialized with black (0)
+    draw = ImageDraw.Draw(img)
+    # Load a default font
+    try:
+        font = ImageFont.truetype("arial.ttf", font_size)  # You can replace this with any valid font path
+    except:
+        font = ImageFont.load_default()
+    # Get the bounding box of the letter
+    bbox = draw.textbbox((0, 0), letter, font=font)
+    text_width, text_height = bbox[2] - bbox[0], bbox[3] - bbox[1]
+    # Calculate the position to center the letter
+    position = (NX // 2 - text_width//1.8  , NY // 2 - text_height//1.2)
+    # Draw the letter on the image
+    draw.text(position, letter, fill=1, font=font)
+    # Convert the image to a NumPy array (1 for white, 0 for black)
+    array = np.array(img)
+    return array
 
-
-if __name__ == "__main__":
-
-    # # Optimize any given antenna
-    optimizer = Optimizer(set_environment=False)
-    optimizer.specification(amplitudes=[1], frequencies=[2], ratio_bw=[0.1], plot=True, CST_default=False)
-    initial = optimizer.generate_binary_pixelated_antenna(n=int(L//D), shape='square')
-    initial = 0.5 * initial
-    optimizer.gradient_descent(initial, linear_map=False, filter=False, Adam=False)
-    
-    
+def add_noise_to_1D(binary_array, dB=0):
+    print(f"adding noise with {dB}dB")
+    length = len(binary_array)
+    noise1 = np.random.rand(length)*0.00001*10**dB # 0.00001 because 5.8e7 scale is too large
+    noise2 = np.random.rand(length)*0.00001*10**dB # 0.00001 because 5.8e7 scale is too large
+    binary_array = binary_array + noise1 - noise2
+    binary_array = np.clip(binary_array, 0, 1)
+    return binary_array
