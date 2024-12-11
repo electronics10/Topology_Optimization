@@ -233,6 +233,9 @@ class Controller(CSTInterface):
         self.d = D
         self.time_step = TSTEP
         self.time_end = TEND
+        point1 = (self.feedx+self.hs/2-0.1, self.feedy, -5-self.hc-self.hs)
+        point2 = (self.feedx+self.hs, self.feedy, -5-self.hc-self.hs)
+        self.port = (point1, point2)
 
 
     # initialize ground, substrate, feed, and port
@@ -361,9 +364,7 @@ class Controller(CSTInterface):
         self.set_excitation(feedPath)
         # Start simulation with feed
         print("fe: simulating")
-        point1 = (self.feedx+self.hs/2-0.1, self.feedy, -5-self.hc-self.hs)
-        point2 = (self.feedx+self.hs, self.feedy, -5-self.hc-self.hs)
-        self.set_port(point1, point2)
+        self.set_port(self.port[0], self.port[1])
         self.start_simulate()
         # Export E field on patch to txt
         E_Path = "txtf\E_excited.txt"
@@ -409,9 +410,7 @@ class Controller(CSTInterface):
             self.set_excitation(excitePath)
         ## Start simulation with plane wave
         print("pw: simulating")
-        point1 = (self.feedx+self.hs/2-0.1, self.feedy, -5-self.hc-self.hs)
-        point2 = (self.feedx+self.hs, self.feedy, -5-self.hc-self.hs)
-        self.set_port(point1, point2)
+        self.set_port(self.port[0], self.port[1])
         self.set_plane_wave()
         self.start_simulate(plane_wave_excitation=True)
         ## Export E field on patch to txt
@@ -780,6 +779,7 @@ class Excitation_Generator:
         self.frequencies = frequencies
         self.ratio_bw = ratio_bw
         self.time_end = None
+        self.time_shift = None
         self.time_step = None
         self.excitePath = None
         self.t = None
@@ -808,6 +808,8 @@ class Excitation_Generator:
         # Automatically determine the duration based on the widest Gaussian pulse width
         max_sigma = max([1 / (2 * np.pi * freq * ratio) for freq, ratio in zip(self.frequencies, self.ratio_bw)])
         self.time_end = 8 * max_sigma  # Duration of the pulse (6 sigma captures ~99.7% of energy)
+        self.time_shift = self.time_end/2
+        self.time_end = 5*self.time_end # Need longer time interval for time reverse in adjoint method
         self.time_end = int(self.time_end) 
         # Time array shifted to start from 0 to self.time_end in nanoseconds (ns)
         self.t = np.linspace(0, self.time_end, int(self.time_end/(self.time_step/self.resolution))+1)
@@ -851,9 +853,9 @@ class Excitation_Generator:
         # Superpose the Gaussian sine waves for each frequency
         for i, freq in enumerate(self.frequencies):
             sigma = 1 / (2 * np.pi * freq * self.ratio_bw[i])
-            sine_wave = np.sin(2 * np.pi * freq * (self.t-self.time_end/2))
+            sine_wave = np.sin(2 * np.pi * freq * (self.t-self.time_shift))
             gaussian_envelope = self.amplitudes[i] * freq * self.ratio_bw[i] * \
-            np.exp((-(self.t-self.time_end/2)**2) / (2 * (sigma**2)))
+            np.exp((-(self.t-self.time_shift)**2) / (2 * (sigma**2)))
             signal += gaussian_envelope * sine_wave
         return signal
 
