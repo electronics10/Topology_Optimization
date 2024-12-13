@@ -26,8 +26,8 @@ if __name__ == "__main__":
 
     # Topology optimization
     alpha = 1
-    linear_map = False
-    filter = False
+    linear_map = True
+    filter = True
     Adam = False
     print(f"alpha={alpha}, linear_map={linear_map}, filter={filter}, Adam={Adam}")
     optimizer.gradient_ascent(initial, alpha=alpha, iterations=60, linear_map=linear_map, filter=filter, Adam=Adam)
