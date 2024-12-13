@@ -809,7 +809,7 @@ class Excitation_Generator:
         max_sigma = max([1 / (2 * np.pi * freq * ratio) for freq, ratio in zip(self.frequencies, self.ratio_bw)])
         self.time_end = 8 * max_sigma  # Duration of the pulse (6 sigma captures ~99.7% of energy)
         self.time_shift = self.time_end/2
-        self.time_end = 5*self.time_end # Need longer time interval for time reverse in adjoint method
+        self.time_end = 3*self.time_end # Need longer time interval for time reverse in adjoint method
         self.time_end = int(self.time_end) 
         # Time array shifted to start from 0 to self.time_end in nanoseconds (ns)
         self.t = np.linspace(0, self.time_end, int(self.time_end/(self.time_step/self.resolution))+1)
