@@ -9,12 +9,12 @@ if __name__ == "__main__":
     excitation_generator.ratio_bw=[0.1]
     excitation_generator.generate()
     print("Spec_dictionary:", excitation_generator.spec_dic)
-    excitation_generator.plot_wave_and_spectrum()
+    # excitation_generator.plot_wave_and_spectrum()
 
     # Set initial antenna topology for the first iteration and start gradient ascent
-    # initial = ad.generate_shape("square")
-    initial = ad.generate_alphabet('A')
-    # initial = 0.5 * initial
+    initial = ad.generate_shape("square")
+    # initial = ad.generate_alphabet('E')
+    initial = 0.5 * initial
     print("Initial topology=\n", initial)
     initial = initial.ravel()
     
@@ -26,11 +26,8 @@ if __name__ == "__main__":
 
     # Topology optimization
     alpha = 1
-    linear_map = True
-    filter = True
+    linear_map = False
+    filter = False
     Adam = False
     print(f"alpha={alpha}, linear_map={linear_map}, filter={filter}, Adam={Adam}")
     optimizer.gradient_ascent(initial, alpha=alpha, iterations=60, linear_map=linear_map, filter=filter, Adam=Adam)
-
-    
-    
