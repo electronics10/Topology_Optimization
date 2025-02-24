@@ -491,7 +491,7 @@ class Optimizer:
 
     # Optimization core---------------------------------------------------------------------------------
     def gradient_ascent(self, primal, alpha=0.5, gamma=0.9, iterations = 80, linear_map=False, filter=True, Adam=True):
-        self.clean_results() # clean legacy, otherwise troublesome when plot
+        self.clean_results() # clean legacy, otherwise troublesome when plotting
         print("Executing gradient ascent:\n")
         '''
         Topology optimization gradient descent parameters:
@@ -558,9 +558,9 @@ class Optimizer:
                 # cond_by_primal = 5.8e7 * ones # linear case
                 cond_by_primal = 100 * ones # won't converge adjustment
             else: 
-                # cond_by_primal = 7.76 * np.log(10) * 10**(7.76 * primal) * 0.1**4 # log (0.1^4 because time and volume differential)
+                cond_by_primal = 7.76 * np.log(10) * 10**(7.76 * primal) * 0.1**4 # log (0.1^4 because time and volume differential)
                 # cond_by_primal = 5.8e7 * np.exp(-primal)/(ones + np.exp(-primal))**2 * 0.1**4 # sigmoid (0.1^4 because time and volume differential)
-                cond_by_primal = ones * 100 # won't converge adjustment
+                # cond_by_primal = ones * 100 # won't converge adjustment
             # overall
             grad_primal = grad_cond * cond_by_primal
             step = grad_primal
@@ -637,7 +637,8 @@ class Optimizer:
         if len_e < len_r: E_received = E_received[:len_e]
         elif len_r < len_e: E_excited = E_excited[:len_r]
         else: pass
-        grad = np.flip(E_received,0)*E_excited # adjoint method
+        # grad = np.flip(E_received,0)*E_excited # adjoint method
+        grad = np.multiply(E_received, E_excited)
         grad = -np.sum(grad, axis=0) # adjoint method continued (see paper: "Topology Optimization of Metallic Antenna")
         return grad
 
@@ -809,7 +810,7 @@ class Excitation_Generator:
         max_sigma = max([1 / (2 * np.pi * freq * ratio) for freq, ratio in zip(self.frequencies, self.ratio_bw)])
         self.time_end = 8 * max_sigma  # Duration of the pulse (6 sigma captures ~99.7% of energy)
         self.time_shift = self.time_end/2
-        self.time_end = 3*self.time_end # Need longer time interval for time reverse in adjoint method
+        self.time_end = 10*self.time_end # Need longer time interval for time reverse in adjoint method
         self.time_end = int(self.time_end) 
         # Time array shifted to start from 0 to self.time_end in nanoseconds (ns)
         self.t = np.linspace(0, self.time_end, int(self.time_end/(self.time_step/self.resolution))+1)
