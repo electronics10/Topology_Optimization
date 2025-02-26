@@ -12,9 +12,9 @@ if __name__ == "__main__":
     # excitation_generator.plot_wave_and_spectrum()
 
     # Set initial antenna topology for the first iteration and start gradient ascent
-    initial = ad.generate_shape("square")
+    initial = ad.generate_shape("rectangle")
     # initial = ad.generate_alphabet('E')
-    initial = 0.5 * initial
+    # initial = 0.5 * initial
     print("Initial topology=\n", initial)
     initial = initial.ravel()
     
