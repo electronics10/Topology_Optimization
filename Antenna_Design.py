@@ -638,7 +638,7 @@ class Optimizer:
         elif len_r < len_e: E_excited = E_excited[:len_r]
         else: pass
         # grad = np.flip(E_received,0)*E_excited # adjoint method
-        grad = np.multiply(E_received, E_excited)
+        grad = np.sum(np.flip(E_received,0) * E_excited, axis=2)
         grad = -np.sum(grad, axis=0) # adjoint method continued (see paper: "Topology Optimization of Metallic Antenna")
         return grad
 
@@ -710,8 +710,10 @@ class Optimizer:
                 #     word = float(word)
                 #     E_abs_square += word**2
                 # time.append(E_abs_square**(1/2)*np.sign(word))
-                E_x = float(line[3])
-                time.append(E_x)
+                # E_x = float(line[3])
+                # time.append(E_x)
+                E_vec = float(line[3:])
+                time.append(E_vec)
             else:
                 grid_E.append(time)
                 time = []
