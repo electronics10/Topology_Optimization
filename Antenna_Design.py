@@ -712,7 +712,7 @@ class Optimizer:
                 # time.append(E_abs_square**(1/2)*np.sign(word))
                 # E_x = float(line[3])
                 # time.append(E_x)
-                E_vec = float(line[3:])
+                E_vec = [float(line[3]), float(line[4]), float(line[5])]
                 time.append(E_vec)
             else:
                 grid_E.append(time)
