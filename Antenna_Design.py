@@ -915,34 +915,43 @@ class Plotter():
         # Plot figure
         # Determine grid size for subplots
         num_plots = len(array_1D)
-        if num_plots == 0: 
-            print("Array length = 0")
-            return None
-        cols = ceil(sqrt(num_plots))
-        rows = ceil(num_plots / cols)
-        # Create figure and subplots
-        fig, axes = plt.subplots(rows, cols)
-        fig.suptitle(file_path)
-        axes = axes.flatten()  # Flatten the axes array for easy iteration
-        # 1d to 2d (core)
-        print("Creating figures...")
-        if true_position:
-            mid = (self.Ld/2, self.Wd/2)
-            for index, distribution_1D in enumerate(array_1D):
-                im = axes[index].imshow(distribution_1D.reshape(self.nx, self.ny), \
+        if num_plots == 1:
+            if true_position:
+                mid = (self.Ld/2, self.Wd/2)
+                im = plt.imshow(array_1D[0].reshape(self.nx, self.ny), \
                                         extent=[-mid[0], self.Ld-mid[0], -mid[1], self.Wd-mid[1]], \
                                         norm=colors.CenteredNorm(), cmap='coolwarm')
-                # axes[index].set_title(f'Iteration {index}')
-        else:
-            for index, distribution_1D in enumerate(array_1D):
-                im = axes[index].imshow(distribution_1D.reshape(self.nx, self.ny), \
+            else:
+                im = plt.imshow(array_1D[0].reshape(self.nx, self.ny), \
                     origin='upper', norm=colors.CenteredNorm(), cmap= 'coolwarm') #'gray_r', 'copper'
-                axes[index].axis('off') # 'off' Hide axis for better visualization
-        fig.colorbar(im, ax = axes[-1], fraction=0.1)
-        # Remove any empty subplots
-        for j in range(index + 1, len(axes)):
-            fig.delaxes(axes[j])
-        # plt.tight_layout()
+            plt.colorbar(im)
+            plt.title(file_path)
+        else: # more than one plot (most of the cases)
+            cols = ceil(sqrt(num_plots))
+            rows = ceil(num_plots / cols)
+            # Create figure and subplots
+            fig, axes = plt.subplots(rows, cols)
+            fig.suptitle(file_path)
+            axes = axes.flatten()  # Flatten the axes array for easy iteration
+            # 1d to 2d (core)
+            print("Creating figures...")
+            if true_position:
+                mid = (self.Ld/2, self.Wd/2)
+                for index, distribution_1D in enumerate(array_1D):
+                    im = axes[index].imshow(distribution_1D.reshape(self.nx, self.ny), \
+                                            extent=[-mid[0], self.Ld-mid[0], -mid[1], self.Wd-mid[1]], \
+                                            norm=colors.CenteredNorm(), cmap='coolwarm')
+                    # axes[index].set_title(f'Iteration {index}')
+            else:
+                for index, distribution_1D in enumerate(array_1D):
+                    im = axes[index].imshow(distribution_1D.reshape(self.nx, self.ny), \
+                        origin='upper', norm=colors.CenteredNorm(), cmap= 'coolwarm') #'gray_r', 'copper'
+                    axes[index].axis('off') # 'off' Hide axis for better visualization
+            fig.colorbar(im, ax = axes[-1], fraction=0.1)
+            # Remove any empty subplots
+            for j in range(index + 1, len(axes)):
+                fig.delaxes(axes[j])
+            # plt.tight_layout()
         print("Figures created")
 
     def parse_iteration_blocks(self, file_path):
@@ -962,7 +971,7 @@ class Plotter():
         print("Done, return array.")
         return result
 
-    def plot_all_results(self, batch=3, true_position=False):
+    def plot_all_results(self, batch=1, true_position=False): # may plot only 1/batch of total history for long history
         for path in self.results_history_path.values():
             for index in range(batch):
                 self.plot_distribution(path, true_position, start=index/batch, end=(index+1)/batch)
