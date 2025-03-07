@@ -558,9 +558,9 @@ class Optimizer:
                 # cond_by_primal = 5.8e7 * ones # linear case
                 cond_by_primal = 100 * ones # won't converge adjustment
             else: 
-                cond_by_primal = 7.76 * np.log(10) * 10**(7.76 * primal) * 0.1**4 # log (0.1^4 because time and volume differential)
+                # cond_by_primal = 7.76 * np.log(10) * 10**(7.76 * primal) * 0.1**4 # log (0.1^4 because time and volume differential)
                 # cond_by_primal = 5.8e7 * np.exp(-primal)/(ones + np.exp(-primal))**2 * 0.1**4 # sigmoid (0.1^4 because time and volume differential)
-                # cond_by_primal = ones * 100 # won't converge adjustment
+                cond_by_primal = ones # won't converge adjustment
             # overall
             grad_primal = grad_cond * cond_by_primal
             step = grad_primal
