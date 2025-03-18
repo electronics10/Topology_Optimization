@@ -639,7 +639,7 @@ class Optimizer:
         else: pass
         # grad = np.flip(E_received,0)*E_excited # adjoint method
         grad = np.sum(np.flip(E_received,0) * E_excited, axis=2)
-        grad = -np.sum(grad, axis=0) # adjoint method continued (see paper: "Topology Optimization of Metallic Antenna")
+        grad = np.sum(grad, axis=0) # adjoint method continued (see paper: "Topology Optimization of Metallic Antenna")
         return grad
 
     # Adjoint method -------------------------------------------------------------------------------
