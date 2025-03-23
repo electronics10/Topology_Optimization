@@ -124,6 +124,14 @@ class CSTInterface:
         # command = "\n".join(command)
         # self.prj.modeler.add_to_history(f"material{index}",command)
 
+    def set_frequency_solver(self):
+        command = ['Sub Main', 'ChangeSolverType "HF Frequency Domain"', 'End Sub']
+        self.excute_vba(command)
+
+    def set_time_solver(self):
+        command = ['Sub Main', 'ChangeSolverType "HF Time Domain"', 'End Sub']
+        self.excute_vba(command)
+
     def start_simulate(self, plane_wave_excitation=False):
         try: # problems occur with extreme conditions
             if plane_wave_excitation:
@@ -1027,3 +1035,32 @@ def add_noise_to_1D(binary_array, dB=0):
     binary_array = binary_array + noise1 - noise2
     binary_array = np.clip(binary_array, 0, 1)
     return binary_array
+
+def continue_iteration(exp, iter, alpha):
+    iter = iter - 1
+    primal_file = "primal_history.txt"
+    step_file = "step_history.txt"
+    primal = read_experiment_history(exp, iter, primal_file)
+    step = read_experiment_history(exp, iter, step_file)
+    primal = primal + alpha * step
+    primal = np.clip(primal, 0, 1)
+    print(f"Primal iteration{iter+1} in experiment{exp} read.")
+    return primal
+
+def read_experiment_history(exp, iter, assign):
+    filePath = f"experiments\\exp{exp}\\results\\{assign}"
+    with open(filePath, 'r') as file:
+        record = False
+        string = ''
+        for line in file:
+            if record: 
+                line = line.strip()
+                if line.startswith(f'Iteration{iter+1}'): break
+                line = line.strip('[')
+                line = line.strip(']')
+                string = string + line + ' '
+            line=line.strip()
+            if line.startswith(f'Iteration{iter}'): record = True
+    string = np.array(string.split(), float)
+    # print(f"Read iteration{iter} in {assign}:\n", string)
+    return string

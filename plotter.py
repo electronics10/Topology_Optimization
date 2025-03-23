@@ -1,8 +1,8 @@
-import Antenna_Design as ad
+from Antenna_Design import Plotter
 
 
 if __name__ == "__main__":
-    plotter = ad.Plotter()
+    plotter = Plotter()
     plotter.plot_all_results(1, true_position=False)
     
     # f = open("macro.txt")
