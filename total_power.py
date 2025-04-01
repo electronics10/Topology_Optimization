@@ -3,10 +3,10 @@ import matplotlib.pyplot as plt
 import csv
 
 
-def data_dict(experiment):
+def data_dict():
     data_dict = []
     max_value = 0
-    with open(f'experiments/exp{experiment}/results/total_power.csv', newline='') as csvfile:
+    with open(f'results/total_power.csv', newline='') as csvfile:
         reader = csv.reader(csvfile)
         for row in reader:
             current_value = float(row[0])
@@ -15,8 +15,7 @@ def data_dict(experiment):
     return np.array(data_dict)/max_value
 
 if __name__ == '__main__':
-    exp = input("experiment: ")
-    data = data_dict(exp)
+    data = data_dict()
     x = np.arange(len(data)+1)
     plt.plot(x[1:], data, marker='o')
     plt.grid()
