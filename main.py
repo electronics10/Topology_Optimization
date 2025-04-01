@@ -45,4 +45,4 @@ if __name__ == "__main__":
     optimizer.primal_init = initial
     # optimizer.Adam_var_init = adam_var
     if clean_legacy: optimizer.clean_results()
-    optimizer.gradient_ascent(linear_map=linear_map, filter=filter, Adam=Adam, max_iter=2, symmetric=True)
+    optimizer.gradient_ascent(linear_map=linear_map, filter=filter, Adam=Adam, max_iter=36, symmetric=True)
