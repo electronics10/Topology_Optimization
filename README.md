@@ -44,7 +44,7 @@ cd Topology_Optimization
 ### 4. Set Up the Conda Environment
 This project uses a predefined environment file (`environment.yml`) to install all dependencies.
 
-- Create the environment:
+- Create the environment (for Windows only):
 ```
 conda env create -f environment.yml
 ```
