@@ -13,10 +13,8 @@ Before running the code, ensure you have the following installed:
 
 ### 1. Install Git
 - **Windows**: Download and install Git from [git-scm.com](https://git-scm.com/downloads). Follow the default installation options.
-- **Mac**: Open a terminal and run `brew install git` (if you have Homebrew) or download from the website above.
-- **Linux**: Open a terminal and run `sudo apt install git` (Ubuntu/Debian) or `sudo yum install git` (CentOS/RHEL).
 
-(Optional) Verify Git is installed by running:
+Verify Git is installed by running:
 ```
 git --version
 ```
@@ -26,10 +24,9 @@ Miniconda is a lightweight version of Anaconda that manages Python environments.
 - Download Miniconda from [docs.conda.io](https://docs.conda.io/en/latest/miniconda.html) (choose the version for your OS: Windows, Mac, or Linux).
 - Follow the installer instructions:
   - **Windows**: Double-click the `.exe` file and follow the prompts. Check "Add Miniconda to my PATH" if available.
-  - **Mac/Linux**: Run the downloaded `.sh` file in a terminal (e.g., `bash Miniconda3-latest-Linux-x86_64.sh`) and follow the prompts.
 - Restart your terminal after installation.
 
-(Optional) Verify Miniconda is installed by running:
+Verify Miniconda is installed by running:
 ```
 conda --version
 ```
