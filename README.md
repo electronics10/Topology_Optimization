@@ -65,11 +65,8 @@ python main.py
 - For errors during `conda env create`, ensure you have an active internet connection, as it downloads packages.
 
 ---
-Let's add a detailed example section to your `README.md` that incorporates the information you provided, along with references to the images you shared. This section will guide your colleague through running the code, understanding the outputs, and interpreting the results. I'll also include the images' descriptions to make the example more concrete.
 
----
-
-## Example: Optimizing an Antenna Design
+## Guide: Optimizing an Antenna Design
 
 This section provides an example of how to use this repository to optimize an antenna design. Follow the steps below to replicate the results.
 
@@ -87,7 +84,7 @@ BW = [0.07]  # ratio bandwidth
 - `FREQ`: The operating frequency in GHz (e.g., 2.45 GHz in this example).
 - `BW`: The ratio bandwidth.
 
-In this example, the antenna is optimized to operate at 2.45 GHz with a bandwidth ratio of 0.07. You can add more frequencies, amplitudes, and bandwidths to the lists if needed (e.g., `AMP = [0.5, 0.5]`, `FREQ = [1.8, 2.45]`, `BW = [0.1, 0.07]` for dual-band optimization).
+Here, the antenna is optimized to operate at 2.45 GHz with a bandwidth ratio of 0.07. You can add more frequencies, amplitudes, and bandwidths to the lists if needed (e.g., `AMP = [0.5, 0.5]`, `FREQ = [1.8, 2.45]`, `BW = [0.1, 0.07]` for dual-band optimization).
 
 **Note**: Polarization support is still under development and may be added in future updates.
 
@@ -96,26 +93,24 @@ To optimize the antenna according to the specified parameters, run the main scri
 ```
 python main.py
 ```
-This will start the optimization process to design an antenna that conforms to the specifications.
-*Antenna Design Domain Creation*
 
-When main.py is executed for the first time, the script will create the antenna design domain, including components such as the substrate, ground, and feed. This is controlled by the following line in main.py:
-python
+#### Antenna Design Domain Creation
+When `main.py` is executed for the first time, the script will create the antenna design domain, including components such as the substrate, ground, and feed. This is controlled by the following line in `main.py`:
+```python
 optimizer = ad.Optimizer(topop, topop, set_environment=True)
+```
+The `set_environment` parameter determines whether the design domain is initialized:
+- **First Run**: Keep `set_environment=True` to create the domain.
+- **Subsequent Runs**: Set `set_environment=False` to avoid recreating the domain, as it already exists. Failing to do so may result in a minor bug where the script attempts to overwrite the existing domain, potentially causing inconsistencies.
 
-The set_environment parameter determines whether the design domain is initialized:
-
-    First Run: Keep set_environment=True to create the domain.
-    Subsequent Runs: Set set_environment=False to avoid recreating the domain, as it already exists. Failing to do so may result in a minor bug where the script attempts to overwrite the existing domain, potentially causing inconsistencies.
-
-To modify this setting, open main.py, locate the optimizer initialization line, and adjust the set_environment parameter as needed before running the script.
+To modify this setting, open `main.py`, locate the `optimizer` initialization line, and adjust the `set_environment` parameter as needed before running the script.
 
 ### 4. Visualize the Iteration Process
 After running `main.py`, you can visualize the antenna's growth over iterations by running:
 ```
 python plotter.py
 ```
-This script will show four images, each representing a different aspect of the optimization process:
+This script will show four images, each representing a different aspect of the optimization process. Here is an example of antenna operating at 1.7 GHz:
 
 - **Conductivity Distribution**: The real conductivity distribution of the antenna topology. This shows the physical layout of the antenna.
   ![Conductivity Distribution](demo/cond.png)
