@@ -6,11 +6,10 @@ import Antenna_Design as ad
 
 if __name__ == "__main__":
     # Read and round primal
-    exp = input("experiment: ")
     iter = input("iteration: ")
     threshold = float(input("threshold: "))
     iter = int(iter)
-    filePath = f"experiments\\exp{exp}\\results\\primal_history.txt"
+    filePath = f"results/primal_history.txt"
     with open(filePath, 'r') as file:
         record = False
         string = ''
@@ -25,12 +24,12 @@ if __name__ == "__main__":
             line=line.strip()
             if line == f'Iteration{iter}': record = True
     string = np.array(string.split(), float)
-    print("Read:\n", string)
+    # print("Read:\n", string)
     # string = np.rint(string) # ceil, floor, fix
     for index, val in enumerate(string):
         if val < threshold: string[index] = 0
         else: string[index] = 1
-    print("Rounded:\n",string)
+    # print("Rounded:\n",string)
     # string = np.ones(49)# test
     cond = string*5.8e7
 
@@ -42,7 +41,7 @@ if __name__ == "__main__":
     # Set verification
     flag = input("Continue (y/n)? ")
     if flag == 'y':
-        transmitter = ad.Controller("CST_Antennas/transmitter.cst")
+        transmitter = ad.Controller("CST_Antennas/topop.cst")
         transmitter.delete_results()
         try: transmitter.delete_signal1()
         except: pass

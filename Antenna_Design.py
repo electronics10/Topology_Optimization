@@ -16,9 +16,9 @@ from math import ceil, sqrt
 
 
 # Design parameter
-L = 42 # mm
-W = 42 # mm
-D = 6 # mm
+L = 48 # mm
+W = 48 # mm
+D = 3 # mm
 NX= int(L//D)
 NY = int(W//D)
 TSTEP = 0.1 # default 0.1 ns for 1~3 GHz
@@ -45,7 +45,11 @@ class CSTInterface:
             self.de = csti.DesignEnvironment.connect(pid)
             # self.de.set_quiet_mode(True) # suppress message box
             print(f"Opening {self.full_path}...")
-            self.prj = self.de.open_project(self.full_path)
+            try: self.prj = self.de.open_project(self.full_path)
+            except: 
+                print(f"Creating new project {self.full_path}")
+                self.prj = self.de.new_mws()
+                self.prj.save(self.full_path)
             open = True
             print(f"{self.full_path} open")
             break
@@ -54,11 +58,13 @@ class CSTInterface:
             print("Opening new design environment...")
             self.de = csti.DesignEnvironment.new()
             # self.de.set_quiet_mode(True) # suppress message box
-            self.prj = self.de.open_project(self.full_path)
+            try: self.prj = self.de.open_project(self.full_path)
+            except: 
+                print(f"Creating new project {self.full_path}")
+                self.prj = self.de.new_mws()
+                self.prj.save(self.full_path)
             open = True
             print(f"{self.full_path} open")
-        # I wish to create project if not created, but I don't know how to.
-        # Therefore, the user need to create *.cst file in advance
 
     def read(self, result_item):
         results = cstr.ProjectFile(self.full_path, True) #bool: allow interactive
@@ -125,14 +131,21 @@ class CSTInterface:
         # self.prj.modeler.add_to_history(f"material{index}",command)
 
     def set_frequency_solver(self):
-        command = ['Sub Main', 'ChangeSolverType "HF Frequency Domain"', 'End Sub']
+        command = ['Sub Main', 'ChangeSolverType "HF Frequency Domain"', 
+                   'Solver.FrequencyRange "1", "3"', 'End Sub']
         self.excute_vba(command)
+        print("Frequency solver set")
 
     def set_time_solver(self):
-        command = ['Sub Main', 'ChangeSolverType "HF Time Domain"', 'End Sub']
-        self.excute_vba(command)
+        command = ['ChangeSolverType "HF Time Domain"', 
+                   'Solver.FrequencyRange "1", "3"']
+        command = "\n".join(command)
+        self.prj.modeler.add_to_history("time_solver_and_freq_range",command)
+        self.save()
+        print("Time solver set")
 
     def start_simulate(self, plane_wave_excitation=False):
+        print("Solving...")
         try: # problems occur with extreme conditions
             if plane_wave_excitation:
                 command = ['Sub Main', 'With Solver', 
@@ -143,6 +156,7 @@ class CSTInterface:
             model = self.prj.modeler
             model.run_solver()
         except Exception as e: pass
+        print("Solved")
     
     def set_plane_wave(self):  # doesn't update history, disappear after save but remain after simulation
         command = ['Sub Main', 'With PlaneWave', '.Reset ', 
@@ -225,7 +239,17 @@ class CSTInterface:
         'DeleteResults', 'End Sub']
         res = self.excute_vba(command)
         return res
- 
+    
+    def xz_symmetric_boundary(self): # don't know how to nonmanually delete though
+        command = ['With Boundary', '.Xmin "expanded open"', 
+                   '.Xmax "expanded open"', '.Ymin "expanded open"', '.Ymax "expanded open"', 
+                   '.Zmin "expanded open"', '.Zmax "expanded open"', '.Xsymmetry "none"', 
+                   '.Ysymmetry "magnetic"', '.Zsymmetry "none"', '.ApplyInAllDirections "False"', 
+                   '.OpenAddSpaceFactor "0.5"', 'End With']
+        command = "\n".join(command)
+        self.prj.modeler.add_to_history("symmetric_boundary",command)
+        self.save()
+        print("Symmetric boundary set")
 
 class Controller(CSTInterface):
     def __init__(self, fname):
@@ -472,12 +496,19 @@ class Optimizer:
         self.time_end = TEND
         self.excitePath = None # use CST default excitation for 1~3 GHz
         self.excitation_power = 1 # use CST default excitation for 1~3 GHz
-        # initiate controller (receiver and transmitter pair)
+        # Initiate controller (receiver and transmitter pair)
         self.receiver = receiver
         self.transmitter = transmitter
         if set_environment: self.set_environment()
-        # self.update_controller()
+        # Set initial optimization parameters
+        self.iter_init = 0
+        self.alpha = 1
+        self.gamma = 0.9
+        self.primal_init = 0.5 * np.ones(self.nx*self.ny)
+        self.Adam_var_init = np.array([np.zeros(self.nx*self.ny), np.zeros(self.nx*self.ny), np.zeros(self.nx*self.ny), np.zeros(self.nx*self.ny)]) # [m, v, m_hat, v_hat]
         # not important
+        os.makedirs("./results", exist_ok=True)
+        os.makedirs("./txtf", exist_ok=True)
         self.results_history_path = {
             'cond':"results\\cond_smoothed_history.txt", 
             'primal':"results\\primal_history.txt",
@@ -491,15 +522,14 @@ class Optimizer:
         self.receiver.set_base()
         self.receiver.set_domain()
         print("Receiver environment set")
-        # Set base and domain for transmitter
-        print("Setting environment for transmitter...")
-        self.transmitter.set_base()
-        self.transmitter.set_domain()
-        print("transmitter environment set")
+        # # Set base and domain for transmitter
+        # print("Setting environment for transmitter...")
+        # self.transmitter.set_base()
+        # self.transmitter.set_domain()
+        # print("transmitter environment set")
 
     # Optimization core---------------------------------------------------------------------------------
-    def gradient_ascent(self, primal, alpha=0.5, gamma=0.9, iterations = 80, linear_map=False, filter=True, Adam=True):
-        self.clean_results() # clean legacy, otherwise troublesome when plotting
+    def gradient_ascent(self, max_iter=36, linear_map=False, filter=False, Adam=False, symmetric=True):
         print("Executing gradient ascent:\n")
         '''
         Topology optimization gradient descent parameters:
@@ -507,15 +537,20 @@ class Optimizer:
         2. gamma is gaussian filter radius shrinking rate per iteration
         3. linear_map means linear or nonlinear conductivity mapping from [0,1] to actual conductivity
         '''
+        # Use symmetry to accelerate
+        if symmetric: 
+            self.receiver.xz_symmetric_boundary()
+            # self.transmitter.xz_symmetric_boundary()
+        # Set up initial parameters
+        primal = self.primal_init
+        adam_var = self.Adam_var_init
         discriminant = 0 # convergence detector
         radius = self.nx/4 # radius for gaussian filter
-        last_grad_CST = np.zeros(self.nx*self.ny) # Initial grad_CST of descent
-        adam_var = np.array([np.zeros(self.nx*self.ny), np.zeros(self.nx*self.ny),\
-            np.zeros(self.nx*self.ny), np.zeros(self.nx*self.ny)]) # Initialize variables in Adam algorithm: [m, v, m_hat, v_hat]
-        ones = np.ones(self.nx*self.ny)
+        ones = np.ones(self.nx*self.ny) # easier to read the code, not important
+        # last_grad_CST = np.zeros(self.nx*self.ny) # Initial grad_CST of descent
         # Gradient ascent loop
         start_time = time.time()
-        for index in range(iterations): # maximum iterations if doesn't converge
+        for index in range(self.iter_init, max_iter): # maximum iterations if doesn't converge
             print(f"Iteration{index}:")
             # # Map and calculate gradient
             # map unit to full
@@ -573,17 +608,17 @@ class Optimizer:
             grad_primal = grad_cond * cond_by_primal
             step = grad_primal
             # Apply Adam algorithm
-            if Adam: step, adam_var = self.Adam(step, index+1, adam_var)
+            if Adam: step, adam_var = self.Adam(grad_primal, index, adam_var)
                 # if radius < self.nx/4: # filter coverage small enough
                 #     if np.sqrt(np.mean((step-last_step)**2))<0.1: pass # not changing
                 #     else: step, adam_var = self.Adam(step, index+1, adam_var)
                 # else: step, adam_var = self.Adam(step, index+1, adam_var)
             # update conductivity distribution
-            # if index % 4 == 0: alpha = 0.1
-            # elif index % 4 == 1: alpha = 1
-            # elif index % 4 == 2: alpha = 0.7
-            # else: alpha = 0.4
-            primal = primal + alpha * step
+            # if index % 4 == 0: self.alpha = 0.1
+            # elif index % 4 == 1: self.alpha = 1
+            # elif index % 4 == 2: self.alpha = 0.7
+            # else: self.alpha = 0.4
+            primal = primal + self.alpha * step
 
             # Print rms to see overall trend
             print(f"rms_grad_CST = {np.sqrt(np.mean(grad_CST**2))}")
@@ -613,7 +648,7 @@ class Optimizer:
             #             print(f"{index+2} iterations in total, take time {end_time-start_time}")
             #             break
             # update radius to make next descent finer
-            if filter: radius *= gamma
+            if filter: radius *= self.gamma
             else: pass
             # update last_grad_CST for next discriminant
             last_grad_CST = grad_CST
@@ -629,8 +664,8 @@ class Optimizer:
         Er_Path, powerPath = self.receiver.plane_wave_excitation(self.excitePath)
         # Transmitter do time reverse excitation
         feedPath = self.power_time_reverse(powerPath)
-        print("Updating transmitter conductivity distribution...")
-        self.transmitter.update_distribution(cond)
+        # print("Updating transmitter conductivity distribution...")
+        # self.transmitter.update_distribution(cond)
         print("Calculating transmitter field...")
         Et_Path = self.transmitter.feed_excitation(feedPath)
         # Calculate gradient by adjoint field method
@@ -732,6 +767,7 @@ class Optimizer:
 
     # Descent algorithm---------------------------------------------------------------------------------------
     def Adam(self, gradient, iteration, adam_var):
+        iteration = iteration + 1
         beta1 = 0.9  # Decay rate for first moment
         beta2 = 0.999  # Decay rate for second moment
         epsilon = 1e-8  # Small value to prevent division by zero
@@ -745,7 +781,7 @@ class Optimizer:
         step = adam_var[2] / (adam_var[3] ** 0.5 + epsilon)
         # Record Adam parameters
         file = open("results\\Adam.txt", "a")
-        file.write(f"Iteration{iteration}, m_hat={np.mean(adam_var[2])}, v_hat={np.mean(adam_var[3])}\n")
+        file.write(f"Iteration{iteration-1}, m_hat={np.mean(adam_var[2])}, v_hat={np.mean(adam_var[3])}\n")
         file.write(f"gradient=\n{gradient}\nm_hat=\n{adam_var[2]}\nv_hat=\n{adam_var[3]}\n")
         file.close()
         # return step
@@ -762,14 +798,14 @@ class Optimizer:
             ## Reset impulse time informtion for controller
             self.receiver.time_step = self.time_step
             self.receiver.time_end = self.time_end
-            self.transmitter.time_step = self.time_step
-            self.transmitter.time_end = self.time_end
+            # self.transmitter.time_step = self.time_step
+            # self.transmitter.time_end = self.time_end
         # Set monitor
         if set_monitor:
             print("Setting monitor for receiver")
             self.receiver.set_monitor()
-            print("Setting monitor for transmitter")
-            self.transmitter.set_monitor()
+            # print("Setting monitor for transmitter")
+            # self.transmitter.set_monitor()
         else: print("Specification: Use monitor from last history entry, make sure same time interval are used.")
 
     # just for convenience-------------------------------------------------------------------------
@@ -831,6 +867,7 @@ class Excitation_Generator:
 
         ## Write excitation file
         self.excitePath = "txtf\excitation.txt"
+        os.makedirs(os.path.dirname(self.excitePath), exist_ok=True)
         file = open(self.excitePath, "w")
         file.write("#\n#'Time / ns'	'default [Real Part]'\n#---------------------------------\n") # IDK why but don't change a word
         for index, value in enumerate(self.signal):
@@ -1036,19 +1073,37 @@ def add_noise_to_1D(binary_array, dB=0):
     binary_array = np.clip(binary_array, 0, 1)
     return binary_array
 
-def continue_iteration(exp, iter, alpha):
+# CST shutdown sometimes, continuation can be done by the following
+def continue_iteration(exp, iter, alpha, Adam):
     iter = iter - 1
     primal_file = "primal_history.txt"
     step_file = "step_history.txt"
+    Adam_file = "Adam.txt"
+    # primal
     primal = read_experiment_history(exp, iter, primal_file)
     step = read_experiment_history(exp, iter, step_file)
     primal = primal + alpha * step
     primal = np.clip(primal, 0, 1)
     print(f"Primal iteration{iter+1} in experiment{exp} read.")
-    return primal
+    # Adam
+    if Adam:
+        beta1 = 0.9  # Decay rate for first moment
+        beta2 = 0.999  # Decay rate for second moment
+        epsilon = 1e-8  # Small value to prevent division by zero
+        adam_var = []
+        m_hat, v_hat = read_Adam_history(exp, iter, Adam_file)
+        adam_var.append(m_hat * (1 - beta1 ** (iter+1) + epsilon)) # adam_var[0]=m, iter+1 because my algorithm start from 1
+        adam_var.append(v_hat * (1 - beta2 ** (iter+1) + epsilon)) # adam_var[1]=v, iter+1 because my algorithm start from 1
+        adam_var.append(m_hat)
+        adam_var.append(v_hat)
+        adam_var = np.array(adam_var)
+    else:
+        zeros = np.zeros(len(primal))
+        adam_var = np.array([zeros, zeros, zeros, zeros])
+    return primal, adam_var
 
 def read_experiment_history(exp, iter, assign):
-    filePath = f"experiments\\exp{exp}\\results\\{assign}"
+    filePath = f"experiments/exp{exp}/results/{assign}"
     with open(filePath, 'r') as file:
         record = False
         string = ''
@@ -1062,5 +1117,36 @@ def read_experiment_history(exp, iter, assign):
             line=line.strip()
             if line.startswith(f'Iteration{iter}'): record = True
     string = np.array(string.split(), float)
-    # print(f"Read iteration{iter} in {assign}:\n", string)
     return string
+
+def read_Adam_history(exp, iter, assign):
+    filePath = f"experiments/exp{exp}/results/{assign}"
+    with open(filePath, 'r') as file:
+        record = False
+        record_m = False
+        record_v = False
+        m_hat = ''
+        v_hat = ''
+        for line in file:
+            if record_v:
+                if line.startswith(f'Iteration{iter+1}'): break
+                line = line.strip()
+                line = line.strip('[')
+                line = line.strip(']')
+                v_hat = v_hat + line + ' '
+            if record_m:
+                if line.startswith(f'v_hat='): 
+                    record_m = False
+                    record_v = True
+                    continue
+                line = line.strip()
+                line = line.strip('[')
+                line = line.strip(']')
+                m_hat = m_hat + line + ' '
+            if record:
+                if line.startswith(f'm_hat='): record_m = True
+            line=line.strip()
+            if line.startswith(f'Iteration{iter}'): record = True
+    m_hat = np.array(m_hat.split(), float)
+    v_hat = np.array(v_hat.split(), float)
+    return m_hat, v_hat

@@ -16,8 +16,8 @@ def data_dict():
 
 if __name__ == '__main__':
     data = data_dict()
-    x = np.arange(len(data)+1)
-    plt.plot(x[1:], data, marker='o')
+    x = np.arange(len(data))
+    plt.plot(x, data, marker='o')
     plt.grid()
     plt.title("Total Power")
     plt.xlabel("Iterations")
