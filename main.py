@@ -36,7 +36,7 @@ if __name__ == "__main__":
     initial = ad.generate_shape("square")
     # initial = ad.generate_shape("rectangle") 
     initial = initial.ravel()
-    # initial, adam_var = ad.continue_iteration(exp, iter, alpha, Adam)
+    # initial, adam_var, power_init = ad.continue_iteration(exp, iter, alpha, Adam)
     # print("Initial topology=\n", initial)
 
     # set optimizer and run
@@ -44,5 +44,6 @@ if __name__ == "__main__":
     optimizer.alpha = alpha
     optimizer.primal_init = initial
     # optimizer.Adam_var_init = adam_var
+    # optimizer.power_init = power_init
     if clean_legacy: optimizer.clean_results()
     optimizer.gradient_ascent(linear_map=linear_map, filter=filter, Adam=Adam, max_iter=36, symmetric=True)

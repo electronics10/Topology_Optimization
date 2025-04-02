@@ -1,5 +1,7 @@
 import sys
 sys.path.append(r"C:\Program Files (x86)\CST STUDIO SUITE 2023\AMD64\python_cst_libraries")
+sys.path.append(r"C:\Program Files (x86)\CST STUDIO SUITE 2024\AMD64\python_cst_libraries")
+sys.path.append(r"C:\Program Files (x86)\CST STUDIO SUITE 2025\AMD64\python_cst_libraries")
 import cst
 import cst.results as cstr
 import cst.interface as csti
@@ -13,6 +15,7 @@ from scipy.fft import fft, fftfreq
 from PIL import Image, ImageDraw, ImageFont
 import matplotlib.colors as colors
 from math import ceil, sqrt
+import difflib
 
 
 # Design parameter
@@ -72,9 +75,15 @@ class CSTInterface:
             res = results.get_3d().get_result_item(result_item)
             res = res.get_data()
         except:
-            print("No result item. Available result items listed below")
-            print(results.get_3d().get_tree_items())
-            res = None
+            print("No result item.")
+            available_files = results.get_3d().get_tree_items()
+            closest_match = difflib.get_close_matches(result_item, available_files, n=1, cutoff=0.5)
+            if closest_match: 
+                result_item = closest_match[0] 
+                print(f"Fetch '{result_item}' instead.")
+            else: result_item = None
+            res = results.get_3d().get_result_item(result_item)
+            res = res.get_data()
         return res
 
     def save(self):
@@ -506,6 +515,8 @@ class Optimizer:
         self.gamma = 0.9
         self.primal_init = 0.5 * np.ones(self.nx*self.ny)
         self.Adam_var_init = np.array([np.zeros(self.nx*self.ny), np.zeros(self.nx*self.ny), np.zeros(self.nx*self.ny), np.zeros(self.nx*self.ny)]) # [m, v, m_hat, v_hat]
+        self.power_init = 0
+        self.received_power = 0
         # not important
         os.makedirs("./results", exist_ok=True)
         os.makedirs("./txtf", exist_ok=True)
@@ -630,29 +641,18 @@ class Optimizer:
             file.close()
 
             # # Discriminant
-            criterion = 0.00003
-            if np.sqrt(np.mean(grad_CST**2)) < criterion: # heuristic (should come up with a more robust criterion)
-                discriminant += 1
-                print(f"rms_grad_CST < {criterion}, optimization process done")
-                if discriminant > 0: # Set converge (last update) for transmitter to read S11
-                    end_time = time.time()
-                    print(f"{index+2} iterations in total, take time {end_time-start_time}")
-                    break
-            # elif np.sqrt(np.mean(grad_CST**2)) < 10*criterion: # heuristic
-            #     if np.dot(last_grad_CST, grad_CST) < 0: 
-            #         discriminant += 1
-            #         print(f"Discriminant detected, discriminant = {discriminant}")
-            #         if discriminant >= 4: # oscillating around extremum
-            #             print("Local extremum detected, optimization process done")
-            #             end_time = time.time()
-            #             print(f"{index+2} iterations in total, take time {end_time-start_time}")
-            #             break
+            if self.received_power >= 10*self.power_init: discriminant += 2
+            elif (index > 8) and (np.sqrt(np.mean(grad_CST**2)) > 150):  discriminant += 1 # already good initial
+            else: discriminant = 0
+            if discriminant > 5:
+                print("Optimization process done!")
+                break
             # update radius to make next descent finer
             if filter: radius *= self.gamma
             else: pass
             # update last_grad_CST for next discriminant
             last_grad_CST = grad_CST
-        if discriminant == 0: print(f"Problem unsolvable in {index+1} iterations")
+        if discriminant <= 5: print(f"Problem unsolvable in {index+1} iterations")
         
 
     def calculate_gradient(self, cond):
@@ -716,6 +716,8 @@ class Optimizer:
             last_time = current_time
         file.close()
         total_power = total_power/self.excitation_power # normalize
+        if self.iter_init == 0: self.power_init = total_power
+        self.received_power = total_power
         '''-------------------------------------------------
         Record received power while doing power_time_reverse for calculating gradient,
         otherwise lose the information since we don't have exact objective function.
@@ -1100,7 +1102,13 @@ def continue_iteration(exp, iter, alpha, Adam):
     else:
         zeros = np.zeros(len(primal))
         adam_var = np.array([zeros, zeros, zeros, zeros])
-    return primal, adam_var
+    # power_init
+    with open(f"experiments/exp{exp}/results/total_power.csv", newline='') as csvfile:
+        spamreader = csv.reader(csvfile, delimiter=' ', quotechar='|')
+        for row in spamreader:
+            power_init = float(row[0])
+            break
+    return primal, adam_var, power_init
 
 def read_experiment_history(exp, iter, assign):
     filePath = f"experiments/exp{exp}/results/{assign}"
