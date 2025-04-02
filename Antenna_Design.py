@@ -647,6 +647,7 @@ class Optimizer:
             if discriminant > 5:
                 print("Optimization process done!")
                 break
+            print("discriminant= ", discriminant)
             # update radius to make next descent finer
             if filter: radius *= self.gamma
             else: pass
