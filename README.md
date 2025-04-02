@@ -63,6 +63,9 @@ python main.py
 ### Troubleshooting
 - If `conda` commands don’t work, ensure Miniconda is added to your system PATH or restart your terminal.
 - For errors during `conda env create`, ensure you have an active internet connection, as it downloads packages.
+- For errors about CST, ensure CST is added to your system PATH. It can also be done by altering the first few line in `Antenna_Design.py`, such as `sys.path.append(r"C:\Program Files (x86)\CST STUDIO SUITE 2023\AMD64\python_cst_libraries")`.
+- Other CST errors might occur due to version difference and cause filepath name variation. One may check the correct file name in CST and change it in `Antenna_Design.py` according to prompt.
+- Contact me for any further issues.
 
 ---
 
