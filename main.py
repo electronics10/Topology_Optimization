@@ -37,7 +37,7 @@ if __name__ == "__main__":
     # initial = ad.generate_shape("square")
     # initial = ad.generate_shape("rectangle") 
     # initial = initial.ravel()
-    initial = np.zeros(topop.nx*topop.ny)
+    initial = np.zeros(optimizer.nx*optimizer.ny)
     initial[::2]=1
     # initial, adam_var, power_init = ad.continue_iteration(exp, iter, alpha, Adam)
     # print("Initial topology=\n", initial)
