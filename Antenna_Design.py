@@ -647,14 +647,13 @@ class Optimizer:
             file.close()
 
             # # Discriminant
-            if self.received_power >= 10*self.power_init: 
-                print("received power = ", self.received_power)
-                discriminant += 1
+            if self.received_power >= 10*self.power_init: discriminant += 1
             elif (index > 8) and (np.sqrt(np.mean(grad_CST**2)) > 15):  discriminant += 1 # already good initial
             else: discriminant = 0
             if discriminant > 4:
                 print("Optimization process done!")
                 break
+            print("received power = ", self.received_power)
             print("discriminant = ", discriminant)
             # update radius to make next descent finer
             if filter: radius *= self.gamma
