@@ -2,7 +2,7 @@ import Antenna_Design as ad
 
 AMP = [0.5, 0.5] # weight for different frequency signal
 FREQ = [1.5, 2.4] # GHz
-BW = [0.07, 0.05] # ratio bandwidth
+BW = [0.12, 0.07] # ratio bandwidth
 
 if __name__ == "__main__":
     # Set excitation signal according to required specification
