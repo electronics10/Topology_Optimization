@@ -631,6 +631,12 @@ class Optimizer:
             # else: self.alpha = 0.4
             primal = primal + self.alpha * step
 
+            # experimental, clip to 0,1 for faster simulation in next iteration. Not sure if it'll work. 20250404
+            threshold = 0.95
+            for index, val in enumerate(primal):
+                if val < threshold: primal[index] = 0
+                else: primal[index] = 1
+
             # Print rms to see overall trend
             print(f"rms_grad_CST = {np.sqrt(np.mean(grad_CST**2))}")
             print(f"rms_step = {np.sqrt(np.mean(step**2))}\n")
