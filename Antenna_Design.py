@@ -346,16 +346,16 @@ class Controller(CSTInterface):
                    f'.SetSubvolumeOffset "{margin}", "{margin}", "{margin}", "{margin}", "{margin}", "{margin}" ', 
                    '.SetSubvolumeInflateWithOffset "True" ', '.PlaneNormal "z" ', 
                    f'.PlanePosition "{self.hc}" ', '.Create ', 'End With']
-        # Set monitor to read power at feed
-        PonFeed = ['With Monitor ', 
-                   '.Reset ', '.Name "power_on_feed" ', '.Dimension "Volume" ', 
-                   '.Domain "Time" ', '.FieldType "Powerflow" ', 
-                   '.Tstart "0" ', f'.Tstep "{self.time_step}" ', f'.Tend "{self.time_end}" ', 
-                   '.UseTend "True" ', '.UseSubvolume "True" ', '.Coordinates "Free" ', 
-                   f'.SetSubvolume "{self.feedx-1}", "{self.feedx+1}", "{self.feedy-1}", "{self.feedy+1}", "{-5-self.hc-self.hs}", "{self.hc}" ', 
-                   '.SetSubvolumeOffset "0.0", "0.0", "0.0", "0.0", "0.0", "0.0" ', 
-                   '.SetSubvolumeInflateWithOffset "True" ', '.PlaneNormal "z" ', 
-                   f'.PlanePosition "{self.hc}" ', '.Create ', 'End With']
+        # # Set monitor to read power at feed
+        # PonFeed = ['With Monitor ', 
+        #            '.Reset ', '.Name "power_on_feed" ', '.Dimension "Volume" ', 
+        #            '.Domain "Time" ', '.FieldType "Powerflow" ', 
+        #            '.Tstart "0" ', f'.Tstep "{self.time_step}" ', f'.Tend "{self.time_end}" ', 
+        #            '.UseTend "True" ', '.UseSubvolume "True" ', '.Coordinates "Free" ', 
+        #            f'.SetSubvolume "{self.feedx-1}", "{self.feedx+1}", "{self.feedy-1}", "{self.feedy+1}", "{-5-self.hc-self.hs}", "{self.hc}" ', 
+        #            '.SetSubvolumeOffset "0.0", "0.0", "0.0", "0.0", "0.0", "0.0" ', 
+        #            '.SetSubvolumeInflateWithOffset "True" ', '.PlaneNormal "z" ', 
+        #            f'.PlanePosition "{self.hc}" ', '.Create ', 'End With']
         # command = EonPatch + PonFeed
         command = EonPatch
         command = "\n".join(command)
@@ -647,13 +647,14 @@ class Optimizer:
             file.close()
 
             # # Discriminant
-            if self.received_power >= 10*self.power_init: discriminant += 2
-            elif (index > 8) and (np.sqrt(np.mean(grad_CST**2)) > 150):  discriminant += 1 # already good initial
+            if self.received_power >= 10*self.power_init: 
+                print("received power = ", self.received_power)
+                discriminant += 1
+            elif (index > 8) and (np.sqrt(np.mean(grad_CST**2)) > 15):  discriminant += 1 # already good initial
             else: discriminant = 0
-            if discriminant > 5:
+            if discriminant > 4:
                 print("Optimization process done!")
                 break
-            print("received power = ", self.received_power)
             print("discriminant = ", discriminant)
             # update radius to make next descent finer
             if filter: radius *= self.gamma
