@@ -1,4 +1,5 @@
 import Antenna_Design as ad
+import numpy as np
 
 AMP = [0.5, 0.5] # weight for different frequency signal
 FREQ = [1.5, 2.4] # GHz
@@ -34,8 +35,10 @@ if __name__ == "__main__":
 
     # set initial antenna topology
     # initial = ad.generate_shape("square")
-    initial = ad.generate_shape("rectangle") 
-    initial = initial.ravel()
+    # initial = ad.generate_shape("rectangle") 
+    # initial = initial.ravel()
+    initial = np.zeros(topop.nx*topop.ny)
+    initial[::2]=1
     # initial, adam_var, power_init = ad.continue_iteration(exp, iter, alpha, Adam)
     # print("Initial topology=\n", initial)
 
