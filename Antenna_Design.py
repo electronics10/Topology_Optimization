@@ -564,6 +564,27 @@ class Optimizer:
         for index in range(self.iter_init, max_iter): # maximum iterations if doesn't converge
             print(f"\nIteration{index}:")
             # # Map and calculate gradient
+            # # map unit to full
+            # if linear_map: 
+            #     primal = np.clip(primal, 0, 1)
+            #     cond = primal*5.8e7
+            # else: # log
+            #     primal = np.clip(primal, 0, 1)
+            #     cond = 10**(7.76 * primal) - 1
+            # else: # sigmoid
+            #     if index == 0: primal = 50 * (primal - 0.5*ones) # since default generation is binary but we don't want [0,1] interval
+            #     primal = np.clip(primal, -25, 25) # otherwise inf, or nan raised (e^21 ~= 1.3e9)
+            #     cond = 1/(ones + np.exp(-primal))*5.8e7 # 5.8e7*sigmoid(primal)
+            # apply Gaussian filter
+            if filter: 
+                # cond_smoothed = scimage.gaussian_filter(cond, radius)
+                primal = np.clip(primal, 0, 1)
+                primal = scimage.gaussian_filter(primal, radius)
+                threshold = 0.5
+                for index, val in enumerate(primal):
+                    if val < threshold: primal[index] = 0
+                    else: primal[index] = 1
+            # else: cond_smoothed = cond
             # map unit to full
             if linear_map: 
                 primal = np.clip(primal, 0, 1)
@@ -571,13 +592,7 @@ class Optimizer:
             else: # log
                 primal = np.clip(primal, 0, 1)
                 cond = 10**(7.76 * primal) - 1
-            # else: # sigmoid
-            #     if index == 0: primal = 50 * (primal - 0.5*ones) # since default generation is binary but we don't want [0,1] interval
-            #     primal = np.clip(primal, -25, 25) # otherwise inf, or nan raised (e^21 ~= 1.3e9)
-            #     cond = 1/(ones + np.exp(-primal))*5.8e7 # 5.8e7*sigmoid(primal)
-            # apply Gaussian filter
-            if filter: cond_smoothed = scimage.gaussian_filter(cond, radius)
-            else: cond_smoothed = cond
+            cond_smoothed = cond
             # calculate gradient by adjoint method
             it_start_time = time.time()
             grad_CST = self.calculate_gradient(cond_smoothed)
@@ -603,18 +618,20 @@ class Optimizer:
             # -------------------------------------------
 
             # # Do gradient descent
-            # calculate primal gradient by chain rule
-            # first chain (derivatives of kernel)
-            if filter: grad_cond = scimage.gaussian_filter(grad_CST, radius)
-            else: grad_cond = grad_CST
-            # second chain
-            if linear_map: 
-                # cond_by_primal = 5.8e7 * ones # linear case
-                cond_by_primal = 100 * ones # won't converge adjustment
-            else: 
-                # cond_by_primal = 7.76 * np.log(10) * 10**(7.76 * primal) * 0.1**4 # log (0.1^4 because time and volume differential)
-                # cond_by_primal = 5.8e7 * np.exp(-primal)/(ones + np.exp(-primal))**2 * 0.1**4 # sigmoid (0.1^4 because time and volume differential)
-                cond_by_primal = ones # won't converge adjustment
+            # # calculate primal gradient by chain rule
+            # # first chain (derivatives of kernel)
+            # if filter: grad_cond = scimage.gaussian_filter(grad_CST, radius)
+            # else: grad_cond = grad_CST
+            # # second chain
+            # if linear_map: 
+            #     # cond_by_primal = 5.8e7 * ones # linear case
+            #     cond_by_primal = 100 * ones # won't converge adjustment
+            # else: 
+            #     # cond_by_primal = 7.76 * np.log(10) * 10**(7.76 * primal) * 0.1**4 # log (0.1^4 because time and volume differential)
+            #     # cond_by_primal = 5.8e7 * np.exp(-primal)/(ones + np.exp(-primal))**2 * 0.1**4 # sigmoid (0.1^4 because time and volume differential)
+            #     cond_by_primal = ones # won't converge adjustment
+            grad_cond = grad_CST
+            cond_by_primal = ones
             # overall
             grad_primal = grad_cond * cond_by_primal
             step = grad_primal
