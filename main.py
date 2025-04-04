@@ -1,8 +1,8 @@
 import Antenna_Design as ad
 
-AMP = [1] # weight for different frequency signal
-FREQ = [2.45] # GHz
-BW = [0.07] # ratio bandwidth
+AMP = [0.5, 0.5] # weight for different frequency signal
+FREQ = [1.5, 2.4] # GHz
+BW = [0.07, 0.05] # ratio bandwidth
 
 if __name__ == "__main__":
     # Set excitation signal according to required specification
@@ -18,7 +18,7 @@ if __name__ == "__main__":
     topop = ad.Controller("CST_Antennas/topop.cst")
     topop.delete_results()
     topop.set_time_solver()
-    optimizer = ad.Optimizer(topop, topop, set_environment=True)
+    optimizer = ad.Optimizer(topop, topop, set_environment=False)
     optimizer.specification(excitation_generator.spec_dic, set_monitor=True)
 
     ## Topology optimization
