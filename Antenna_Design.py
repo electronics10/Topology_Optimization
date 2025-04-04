@@ -562,7 +562,7 @@ class Optimizer:
         # Gradient ascent loop
         start_time = time.time()
         for index in range(self.iter_init, max_iter): # maximum iterations if doesn't converge
-            print(f"Iteration{index}:")
+            print(f"\nIteration{index}:")
             # # Map and calculate gradient
             # map unit to full
             if linear_map: 
@@ -639,7 +639,7 @@ class Optimizer:
 
             # Print rms to see overall trend
             print(f"rms_grad_CST = {np.sqrt(np.mean(grad_CST**2))}")
-            print(f"rms_step = {np.sqrt(np.mean(step**2))}\n")
+            print(f"rms_step = {np.sqrt(np.mean(step**2))}")
             # Record step
             file = open(self.results_history_path['step'], "a")
             file.write(f"Iteration{index}, rms_step={np.sqrt(np.mean(step**2))}\n")
@@ -653,7 +653,7 @@ class Optimizer:
             if discriminant > 5:
                 print("Optimization process done!")
                 break
-            print("discriminant= ", discriminant)
+            print("discriminant = ", discriminant)
             # update radius to make next descent finer
             if filter: radius *= self.gamma
             else: pass
