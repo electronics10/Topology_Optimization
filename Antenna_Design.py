@@ -653,6 +653,7 @@ class Optimizer:
             if discriminant > 5:
                 print("Optimization process done!")
                 break
+            print("received power = ", self.received_power)
             print("discriminant = ", discriminant)
             # update radius to make next descent finer
             if filter: radius *= self.gamma
@@ -1110,7 +1111,8 @@ def continue_iteration(exp, iter, alpha, Adam):
         zeros = np.zeros(len(primal))
         adam_var = np.array([zeros, zeros, zeros, zeros])
     # power_init
-    with open(f"experiments/exp{exp}/results/total_power.csv", newline='') as csvfile:
+    # with open(f"experiments/exp{exp}/results/total_power.csv", newline='') as csvfile:
+    with open("results/total_power.csv", newline='') as csvfile:
         spamreader = csv.reader(csvfile, delimiter=' ', quotechar='|')
         for row in spamreader:
             power_init = float(row[0])
@@ -1118,7 +1120,8 @@ def continue_iteration(exp, iter, alpha, Adam):
     return primal, adam_var, power_init
 
 def read_experiment_history(exp, iter, assign):
-    filePath = f"experiments/exp{exp}/results/{assign}"
+    # filePath = f"experiments/exp{exp}/results/{assign}"
+    filePath = f"results/{assign}"
     with open(filePath, 'r') as file:
         record = False
         string = ''
@@ -1135,7 +1138,8 @@ def read_experiment_history(exp, iter, assign):
     return string
 
 def read_Adam_history(exp, iter, assign):
-    filePath = f"experiments/exp{exp}/results/{assign}"
+    # filePath = f"experiments/exp{exp}/results/{assign}"
+    filePath = f"results/{assign}"
     with open(filePath, 'r') as file:
         record = False
         record_m = False
