@@ -2,7 +2,7 @@ import Antenna_Design as ad
 
 AMP = [0.5, 0.5] # weight for different frequency signal
 FREQ = [1.5, 2.4] # GHz
-BW = [0.12, 0.07] # ratio bandwidth
+BW = [0.13, 0.07] # ratio bandwidth
 
 if __name__ == "__main__":
     # Set excitation signal according to required specification
@@ -12,7 +12,7 @@ if __name__ == "__main__":
     excitation_generator.ratio_bw = BW
     excitation_generator.generate()
     print("Spec_dictionary:", excitation_generator.spec_dic)
-    # excitation_generator.plot_wave_and_spectrum()
+    excitation_generator.plot_wave_and_spectrum()
     
     ## Initiate optimizer
     topop = ad.Controller("CST_Antennas/topop.cst")
@@ -33,8 +33,8 @@ if __name__ == "__main__":
     print(f"alpha={alpha}, linear_map={linear_map}, filter={filter}, Adam={Adam}")
 
     # set initial antenna topology
-    initial = ad.generate_shape("square")
-    # initial = ad.generate_shape("rectangle") 
+    # initial = ad.generate_shape("square")
+    initial = ad.generate_shape("rectangle") 
     initial = initial.ravel()
     # initial, adam_var, power_init = ad.continue_iteration(exp, iter, alpha, Adam)
     # print("Initial topology=\n", initial)
