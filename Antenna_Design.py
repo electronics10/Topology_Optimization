@@ -515,7 +515,7 @@ class Optimizer:
         self.gamma = 0.9
         self.primal_init = 0.5 * np.ones(self.nx*self.ny)
         self.Adam_var_init = np.array([np.zeros(self.nx*self.ny), np.zeros(self.nx*self.ny), np.zeros(self.nx*self.ny), np.zeros(self.nx*self.ny)]) # [m, v, m_hat, v_hat]
-        self.power_init = 0
+        self.power_init = 100
         self.received_power = 0
         # not important
         os.makedirs("./results", exist_ok=True)
@@ -559,32 +559,12 @@ class Optimizer:
         radius = self.nx/4 # radius for gaussian filter
         ones = np.ones(self.nx*self.ny) # easier to read the code, not important
         # last_grad_CST = np.zeros(self.nx*self.ny) # Initial grad_CST of descent
+        
         # Gradient ascent loop
         start_time = time.time()
         for index in range(self.iter_init, max_iter): # maximum iterations if doesn't converge
             print(f"\nIteration{index}:")
-            # # Map and calculate gradient
-            # # map unit to full
-            # if linear_map: 
-            #     primal = np.clip(primal, 0, 1)
-            #     cond = primal*5.8e7
-            # else: # log
-            #     primal = np.clip(primal, 0, 1)
-            #     cond = 10**(7.76 * primal) - 1
-            # else: # sigmoid
-            #     if index == 0: primal = 50 * (primal - 0.5*ones) # since default generation is binary but we don't want [0,1] interval
-            #     primal = np.clip(primal, -25, 25) # otherwise inf, or nan raised (e^21 ~= 1.3e9)
-            #     cond = 1/(ones + np.exp(-primal))*5.8e7 # 5.8e7*sigmoid(primal)
-            # apply Gaussian filter
-            if filter: 
-                # cond_smoothed = scimage.gaussian_filter(cond, radius)
-                primal = np.clip(primal, 0, 1)
-                primal = scimage.gaussian_filter(primal, radius)
-                threshold = 0.5
-                for index, val in enumerate(primal):
-                    if val < threshold: primal[index] = 0
-                    else: primal[index] = 1
-            # else: cond_smoothed = cond
+            # Map and calculate gradient
             # map unit to full
             if linear_map: 
                 primal = np.clip(primal, 0, 1)
@@ -592,14 +572,21 @@ class Optimizer:
             else: # log
                 primal = np.clip(primal, 0, 1)
                 cond = 10**(7.76 * primal) - 1
-            cond_smoothed = cond
-            # calculate gradient by adjoint method
+            # else: # sigmoid
+            #     if index == 0: primal = 50 * (primal - 0.5*ones) # since default generation is binary but we don't want [0,1] interval
+            #     primal = np.clip(primal, -25, 25) # otherwise inf, or nan raised (e^21 ~= 1.3e9)
+            #     cond = 1/(ones + np.exp(-primal))*5.8e7 # 5.8e7*sigmoid(primal)
+            
+            # Apply Gaussian filter
+            if filter: cond_smoothed = scimage.gaussian_filter(cond, radius)
+            else: cond_smoothed = cond
+                
+            # Calculate gradient by adjoint method
             it_start_time = time.time()
             grad_CST = self.calculate_gradient(cond_smoothed)
             it_end_time = time.time()
             print("iteration time =", it_end_time-it_start_time)
 
-            # # Record ---------------------------------
             # Record conductivity (smoothed)
             file = open(self.results_history_path['cond'], "a")
             file.write(f"Iteration{index}, filter_radius={radius}\n")
@@ -611,13 +598,13 @@ class Optimizer:
             file.write(f"{primal}\n")
             file.close()
             # Record grad_CST
+            rms_grad_CST = np.sqrt(np.mean(grad_CST**2))
             file = open(self.results_history_path['grad_CST'], "a")
-            file.write(f"Iteration{index}, rms_grad_CST={np.sqrt(np.mean(grad_CST**2))}\n")
+            file.write(f"Iteration{index}, rms_grad_CST={rms_grad_CST}\n")
             file.write(f"{grad_CST}\n")
             file.close() 
-            # -------------------------------------------
 
-            # # Do gradient descent
+            # Gradient ascent
             # # calculate primal gradient by chain rule
             # # first chain (derivatives of kernel)
             # if filter: grad_cond = scimage.gaussian_filter(grad_CST, radius)
@@ -630,32 +617,22 @@ class Optimizer:
             #     # cond_by_primal = 7.76 * np.log(10) * 10**(7.76 * primal) * 0.1**4 # log (0.1^4 because time and volume differential)
             #     # cond_by_primal = 5.8e7 * np.exp(-primal)/(ones + np.exp(-primal))**2 * 0.1**4 # sigmoid (0.1^4 because time and volume differential)
             #     cond_by_primal = ones # won't converge adjustment
-            grad_cond = grad_CST
-            cond_by_primal = ones
-            # overall
-            grad_primal = grad_cond * cond_by_primal
+            # grad_primal = grad_cond * cond_by_primal
+            grad_primal = grad_CST
             step = grad_primal
             # Apply Adam algorithm
             if Adam: step, adam_var = self.Adam(grad_primal, index, adam_var)
-                # if radius < self.nx/4: # filter coverage small enough
-                #     if np.sqrt(np.mean((step-last_step)**2))<0.1: pass # not changing
-                #     else: step, adam_var = self.Adam(step, index+1, adam_var)
-                # else: step, adam_var = self.Adam(step, index+1, adam_var)
-            # update conductivity distribution
-            # if index % 4 == 0: self.alpha = 0.1
-            # elif index % 4 == 1: self.alpha = 1
-            # elif index % 4 == 2: self.alpha = 0.7
-            # else: self.alpha = 0.4
             primal = primal + self.alpha * step
 
-            # experimental, clip to 0,1 for faster simulation in next iteration. Not sure if it'll work. 20250404
-            threshold = 0.95
-            for index, val in enumerate(primal):
-                if val < threshold: primal[index] = 0
-                else: primal[index] = 1
+            # Experimental. Assume mostly saddle points and self penalty trivial, we can clip to 0,1 for faster simulation in next iteration. 20250404
+            if index >= 0:
+                threshold = 0.95
+                for index, val in enumerate(primal):
+                    if val < threshold: primal[index] = 0
+                    else: primal[index] = 1
 
             # Print rms to see overall trend
-            print(f"rms_grad_CST = {np.sqrt(np.mean(grad_CST**2))}")
+            print(f"rms_grad_CST = {rms_grad_CST}")
             print(f"rms_step = {np.sqrt(np.mean(step**2))}")
             # Record step
             file = open(self.results_history_path['step'], "a")
@@ -663,20 +640,22 @@ class Optimizer:
             file.write(f"{step}\n")
             file.close()
 
-            # # Discriminant
-            if self.received_power >= 10*self.power_init: discriminant += 1
-            elif (index > 8) and (np.sqrt(np.mean(grad_CST**2)) > 15):  discriminant += 1 # already good initial
-            else: discriminant = 0
+            # Discriminant
+            if index == 0: self.power_init = self.received_power
+            if self.received_power >= 10*self.power_init: 
+                print("Large received power detected.")
+                discriminant += 1
+            else: discriminant = 0 # reset
             if discriminant > 4:
                 print("Optimization process done!")
                 break
             print("received power = ", self.received_power)
             print("discriminant = ", discriminant)
             # update radius to make next descent finer
-            if filter: radius *= self.gamma
+            if filter: 
+                print("filter radius = ", radius)
+                radius *= self.gamma
             else: pass
-            # update last_grad_CST for next discriminant
-            last_grad_CST = grad_CST
         if discriminant <= 5: print(f"Problem unsolvable in {index+1} iterations")
         
 
@@ -741,7 +720,6 @@ class Optimizer:
             last_time = current_time
         file.close()
         total_power = total_power/self.excitation_power # normalize
-        if self.iter_init == 0: self.power_init = total_power
         self.received_power = total_power
         '''-------------------------------------------------
         Record received power while doing power_time_reverse for calculating gradient,
