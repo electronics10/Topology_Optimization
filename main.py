@@ -4,6 +4,7 @@ import numpy as np
 AMP = [0.5, 0.5] # weight for different frequency signal
 FREQ = [1.5, 2.4] # GHz
 BW = [0.13, 0.07] # ratio bandwidth
+# AXRR = [0, 0] # axial ratio reciprocal (minor_axis/major_axis)
 
 if __name__ == "__main__":
     # Set excitation signal according to required specification
