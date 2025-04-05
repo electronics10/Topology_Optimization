@@ -29,17 +29,15 @@ if __name__ == "__main__":
     alpha = 1
     clean_legacy = True # set "False" for continuation, copy experiment results to global reults folder
     linear_map = False
-    filter = True
+    filter = False
     Adam = True
     print(f"alpha={alpha}, linear_map={linear_map}, filter={filter}, Adam={Adam}")
 
     # set initial antenna topology
-    # initial = ad.generate_shape("square")
+    initial = ad.generate_shape("square")
     # initial = ad.generate_shape("rectangle") 
-    # initial = initial.ravel()
-    n = optimizer.nx
-    initial = np.zeros(n*optimizer.ny)
-    for i in range(n): initial[i*n+i%2:(i+1)*n+i%2:2] = 1
+    initial = initial*0.5
+    initial = initial.ravel()
     # initial, adam_var, power_init = ad.continue_iteration(exp, iter, alpha, Adam)
     # print("Initial topology=\n", initial)
 
