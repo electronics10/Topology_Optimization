@@ -24,12 +24,12 @@ if __name__ == "__main__":
 
     ## Topology optimization
     # parameters
-    exp = "test"
+    exp = "dual_band"
     iter = 0
     alpha = 1
     clean_legacy = True # set "False" for continuation, copy experiment results to global reults folder
     linear_map = False
-    filter = False
+    filter = True
     Adam = True
     print(f"alpha={alpha}, linear_map={linear_map}, filter={filter}, Adam={Adam}")
 
