@@ -578,7 +578,9 @@ class Optimizer:
             #     cond = 1/(ones + np.exp(-primal))*5.8e7 # 5.8e7*sigmoid(primal)
             
             # Apply Gaussian filter
-            if filter: cond_smoothed = scimage.gaussian_filter(cond, radius)
+            if filter:
+                cond_smoothed = scimage.gaussian_filter(cond.reshape(self.nx,self.ny), radius)
+                cond_smoothed = cond_smoothed.ravel()
             else: cond_smoothed = cond
                 
             # Calculate gradient by adjoint method
