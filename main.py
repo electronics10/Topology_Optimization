@@ -14,7 +14,7 @@ if __name__ == "__main__":
     excitation_generator.ratio_bw = BW
     excitation_generator.generate()
     print("Spec_dictionary:", excitation_generator.spec_dic)
-    excitation_generator.plot_wave_and_spectrum()
+    # excitation_generator.plot_wave_and_spectrum()
     
     ## Initiate optimizer
     topop = ad.Controller("CST_Antennas/topop.cst")
@@ -30,7 +30,7 @@ if __name__ == "__main__":
     alpha = 1
     clean_legacy = False # set "False" for continuation, copy experiment results to global reults folder
     linear_map = False
-    filter = True
+    filter = False
     Adam = True
     print(f"alpha={alpha}, linear_map={linear_map}, filter={filter}, Adam={Adam}")
 
