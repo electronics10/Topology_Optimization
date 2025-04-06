@@ -571,7 +571,7 @@ class Optimizer:
             else: pass
 
             # Experimental. Assume mostly saddle points and self penalty trivial, we can clip to 0,1 for faster simulation in next iteration. 20250404
-            threshold = 0.95
+            threshold = 0.5
             for i, val in enumerate(primal):
                 if val < threshold: primal[i] = 0
                 else: primal[i] = 1
