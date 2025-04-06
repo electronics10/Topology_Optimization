@@ -627,11 +627,10 @@ class Optimizer:
             primal = primal + self.alpha * step
 
             # Experimental. Assume mostly saddle points and self penalty trivial, we can clip to 0,1 for faster simulation in next iteration. 20250404
-            if index >= 0:
-                threshold = 0.95
-                for index, val in enumerate(primal):
-                    if val < threshold: primal[index] = 0
-                    else: primal[index] = 1
+            threshold = 0.95
+            for i, val in enumerate(primal):
+                if val < threshold: primal[i] = 0
+                else: primal[i] = 1
 
             # Print rms to see overall trend
             print(f"rms_grad_CST = {rms_grad_CST}")
