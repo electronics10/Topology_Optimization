@@ -556,7 +556,7 @@ class Optimizer:
         primal = self.primal_init
         adam_var = self.Adam_var_init
         discriminant = 0 # convergence detector
-        radius = self.nx/4 # radius for gaussian filter
+        radius = self.nx/16 # radius for gaussian filter
         ones = np.ones(self.nx*self.ny) # easier to read the code, not important
         # last_grad_CST = np.zeros(self.nx*self.ny) # Initial grad_CST of descent
         
@@ -568,13 +568,11 @@ class Optimizer:
             if filter:
                 primal = scimage.gaussian_filter(primal.reshape(self.nx,self.ny), radius)
                 primal = primal.ravel()
-            else: pass
-
-            # Experimental. Assume mostly saddle points and self penalty trivial, we can clip to 0,1 for faster simulation in next iteration. 20250404
-            threshold = 0.5
-            for i, val in enumerate(primal):
-                if val < threshold: primal[i] = 0
-                else: primal[i] = 1
+                # Experimental. Assume mostly saddle points and self penalty trivial, we can clip to 0,1 for faster simulation in next iteration. 20250404
+                threshold = 0.5
+                for i, val in enumerate(primal):
+                    if val < threshold: primal[i] = 0
+                    else: primal[i] = 1
             
             # Map primal to cond
             if linear_map: 
