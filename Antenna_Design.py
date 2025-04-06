@@ -564,8 +564,19 @@ class Optimizer:
         start_time = time.time()
         for index in range(self.iter_init, max_iter): # maximum iterations if doesn't converge
             print(f"\nIteration{index}:")
-            # Map and calculate gradient
-            # map unit to full
+            # Apply Gaussian filter
+            if filter:
+                primal = scimage.gaussian_filter(primal.reshape(self.nx,self.ny), radius)
+                primal = primal.ravel()
+            else: pass
+
+            # Experimental. Assume mostly saddle points and self penalty trivial, we can clip to 0,1 for faster simulation in next iteration. 20250404
+            threshold = 0.95
+            for i, val in enumerate(primal):
+                if val < threshold: primal[i] = 0
+                else: primal[i] = 1
+            
+            # Map primal to cond
             if linear_map: 
                 primal = np.clip(primal, 0, 1)
                 cond = primal*5.8e7
@@ -577,12 +588,14 @@ class Optimizer:
             #     primal = np.clip(primal, -25, 25) # otherwise inf, or nan raised (e^21 ~= 1.3e9)
             #     cond = 1/(ones + np.exp(-primal))*5.8e7 # 5.8e7*sigmoid(primal)
             
-            # Apply Gaussian filter
-            if filter:
-                cond_smoothed = scimage.gaussian_filter(cond.reshape(self.nx,self.ny), radius)
-                cond_smoothed = cond_smoothed.ravel()
-            else: cond_smoothed = cond
-                
+            # # Apply Gaussian filter
+            # if filter:
+            #     cond_smoothed = scimage.gaussian_filter(cond.reshape(self.nx,self.ny), radius)
+            #     cond_smoothed = cond_smoothed.ravel()
+            # else: cond_smoothed = cond
+            
+            cond_smoothed = cond # legacy
+            
             # Calculate gradient by adjoint method
             it_start_time = time.time()
             grad_CST = self.calculate_gradient(cond_smoothed)
@@ -607,6 +620,7 @@ class Optimizer:
             file.close() 
 
             # Gradient ascent
+            # # Legacy--------
             # # calculate primal gradient by chain rule
             # # first chain (derivatives of kernel)
             # if filter: grad_cond = scimage.gaussian_filter(grad_CST, radius)
@@ -620,17 +634,12 @@ class Optimizer:
             #     # cond_by_primal = 5.8e7 * np.exp(-primal)/(ones + np.exp(-primal))**2 * 0.1**4 # sigmoid (0.1^4 because time and volume differential)
             #     cond_by_primal = ones # won't converge adjustment
             # grad_primal = grad_cond * cond_by_primal
+            # # ----------
             grad_primal = grad_CST
             step = grad_primal
             # Apply Adam algorithm
             if Adam: step, adam_var = self.Adam(grad_primal, index, adam_var)
             primal = primal + self.alpha * step
-
-            # Experimental. Assume mostly saddle points and self penalty trivial, we can clip to 0,1 for faster simulation in next iteration. 20250404
-            threshold = 0.95
-            for i, val in enumerate(primal):
-                if val < threshold: primal[i] = 0
-                else: primal[i] = 1
 
             # Print rms to see overall trend
             print(f"rms_grad_CST = {rms_grad_CST}")
