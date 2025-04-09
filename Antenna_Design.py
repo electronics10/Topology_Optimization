@@ -421,20 +421,20 @@ class Controller(CSTInterface):
         #         line[1] = 20*np.log10(line[1]) # convert to dB
         #         writer.writerow(line[:-1])
         #     writer.writerow([]) # space line for seperation from next call
-        # Record Tx_input_signal to Tx_input_signal.csv
-        Tx_input_signal = self.read('1D Results\\Port signals\\i1')
-        with open('results\\Tx_input_signal.csv', 'a', newline='') as csvfile:
-            writer = csv.writer(csvfile)
-            for line in Tx_input_signal: # [(time, signal_value),...]
-                writer.writerow(line)
-            writer.writerow([]) # space line for seperation from next call
-        # Record Tx_reflected_signal to Tx_reflected_signal.csv
-        Tx_reflected_signal = self.read('1D Results\\Port signals\\o1,1')
-        with open('results\\Tx_reflected_signal.csv', 'a', newline='') as csvfile2:
-            writer2 = csv.writer(csvfile2)
-            for line in Tx_reflected_signal: # [(time, signal_value),...]
-                writer2.writerow(line)
-            writer2.writerow([]) # space line for seperation from next call
+        # # Record Tx_input_signal to Tx_input_signal.csv
+        # Tx_input_signal = self.read('1D Results\\Port signals\\i1')
+        # with open('results\\Tx_input_signal.csv', 'a', newline='') as csvfile:
+        #     writer = csv.writer(csvfile)
+        #     for line in Tx_input_signal: # [(time, signal_value),...]
+        #         writer.writerow(line)
+        #     writer.writerow([]) # space line for seperation from next call
+        # # Record Tx_reflected_signal to Tx_reflected_signal.csv
+        # Tx_reflected_signal = self.read('1D Results\\Port signals\\o1,1')
+        # with open('results\\Tx_reflected_signal.csv', 'a', newline='') as csvfile2:
+        #     writer2 = csv.writer(csvfile2)
+        #     for line in Tx_reflected_signal: # [(time, signal_value),...]
+        #         writer2.writerow(line)
+        #     writer2.writerow([]) # space line for seperation from next call
         # Must delete before return, otherwise CST will save and raise popup window in next iteration
         self.delete_results() # otherwise CST may raise popup window
         self.delete_signal1() # otherwise CST may raise popup window
@@ -477,13 +477,13 @@ class Controller(CSTInterface):
         for row in power_data:
             file.write(f"{row[0]} {row[1]}\n")
         file.close()
-        # Record Rx_signal to Rx_signal.csv
-        Rx_signal = self.read('1D Results\\Port signals\\o1 [pw]')
-        with open('results\\Rx_signal.csv', 'a', newline='') as csvfile:
-            writer = csv.writer(csvfile)
-            for line in Rx_signal: # [(time, signal_value),...]
-                writer.writerow(line)
-            writer.writerow([]) # space line for seperation from next call
+        # # Record Rx_signal to Rx_signal.csv
+        # Rx_signal = self.read('1D Results\\Port signals\\o1 [pw]')
+        # with open('results\\Rx_signal.csv', 'a', newline='') as csvfile:
+        #     writer = csv.writer(csvfile)
+        #     for line in Rx_signal: # [(time, signal_value),...]
+        #         writer.writerow(line)
+        #     writer.writerow([]) # space line for seperation from next call
         ## Must delete before return, otherwise CST will save and raise popup window in next iteration
         self.delete_results() # otherwise CST may raise popup window
         self.delete_port() # otherwise CST may raise popup window
