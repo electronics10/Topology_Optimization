@@ -36,7 +36,7 @@ if __name__ == "__main__":
 
     # set initial antenna topology
     # initial = ad.generate_shape("square")
-    # initial = ad.generate_shape("rectangle") 
+    initial = ad.generate_shape("rectangle") 
     # initial = initial*0.5
     initial = initial.ravel()
     # initial, adam_var, power_init = ad.continue_iteration(exp, iter, alpha, Adam)
