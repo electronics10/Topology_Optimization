@@ -26,9 +26,9 @@ if __name__ == "__main__":
     ## Topology optimization
     # parameters
     exp = "dual_band"
-    iter = 1
+    iter = 0
     alpha = 1
-    clean_legacy = False # set "False" for continuation, copy experiment results to global reults folder
+    clean_legacy = True # set "False" for continuation, copy experiment results to global reults folder
     linear_map = False
     filter = False
     Adam = False
@@ -36,12 +36,12 @@ if __name__ == "__main__":
 
     # set initial antenna topology
     # initial = ad.generate_shape("square")
-    # # initial = ad.generate_shape("rectangle") 
+    # initial = ad.generate_shape("rectangle") 
     # initial = initial*0.5
-    # initial = initial.ravel()
-    initial, adam_var, power_init = ad.continue_iteration(exp, iter, alpha, Adam)
-    optimizer.Adam_var_init = adam_var
-    optimizer.power_init = power_init
+    initial = initial.ravel()
+    # initial, adam_var, power_init = ad.continue_iteration(exp, iter, alpha, Adam)
+    # optimizer.Adam_var_init = adam_var
+    # optimizer.power_init = power_init
 
     # set optimizer and run
     optimizer.iter_init = iter
