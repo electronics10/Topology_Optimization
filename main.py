@@ -20,7 +20,7 @@ if __name__ == "__main__":
     topop = ad.Controller("CST_Antennas/topop.cst")
     topop.delete_results()
     topop.set_time_solver()
-    optimizer = ad.Optimizer(topop, topop, set_environment=True)
+    optimizer = ad.Optimizer(topop, topop, set_environment=False)
     optimizer.specification(excitation_generator.spec_dic, set_monitor=True)
 
     ## Topology optimization
