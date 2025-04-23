@@ -14,7 +14,7 @@ if __name__ == "__main__":
     excitation_generator.ratio_bw = BW
     excitation_generator.generate()
     print("Spec_dictionary:", excitation_generator.spec_dic)
-    excitation_generator.plot_wave_and_spectrum()
+    # excitation_generator.plot_wave_and_spectrum()
     
     ## Initiate optimizer
     topop = ad.Controller("CST_Antennas/topop.cst")
