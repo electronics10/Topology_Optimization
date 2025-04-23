@@ -1,8 +1,8 @@
 import Antenna_Design as ad
 import numpy as np
 
-AMP = [0.5, 0.5] # weight for different frequency signal
-FREQ = [1.5, 2.4] # GHz
+AMP = [0.4, 0.6] # weight for different frequency signal
+FREQ = [1.8, 2.7] # GHz
 BW = [0.13, 0.07] # ratio bandwidth
 # AXRR = [0, 0] # axial ratio reciprocal (minor_axis/major_axis)
 
@@ -14,7 +14,7 @@ if __name__ == "__main__":
     excitation_generator.ratio_bw = BW
     excitation_generator.generate()
     print("Spec_dictionary:", excitation_generator.spec_dic)
-    # excitation_generator.plot_wave_and_spectrum()
+    excitation_generator.plot_wave_and_spectrum()
     
     ## Initiate optimizer
     topop = ad.Controller("CST_Antennas/topop.cst")
