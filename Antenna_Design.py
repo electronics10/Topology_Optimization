@@ -568,12 +568,13 @@ class Optimizer:
             if filter:
                 primal = scimage.gaussian_filter(primal.reshape(self.nx,self.ny), radius)
                 primal = primal.ravel()
-            # Experimental. Assume mostly saddle points and self penalty trivial, we can clip to 0,1 for faster simulation in next iteration. 20250422
-            threshold = np.random.rand()
-            print(f"threshold = {threshold}")
-            for i, val in enumerate(primal):
-                if val < threshold: primal[i] = 0
-                else: primal[i] = 1
+            
+            # # Experimental. Assume mostly saddle points and self penalty trivial, we can clip to 0,1 for faster simulation in next iteration. 20250422
+            # threshold = np.random.rand()
+            # print(f"threshold = {threshold}")
+            # for i, val in enumerate(primal):
+            #     if val < threshold: primal[i] = 0
+            #     else: primal[i] = 1
             
             # Map primal to cond
             if linear_map: 
