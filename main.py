@@ -27,7 +27,7 @@ if __name__ == "__main__":
     # parameters
     exp = "dual_band"
     iter = 0
-    alpha = 1
+    alpha = 0.2
     clean_legacy = True # set "False" for continuation, copy experiment results to global reults folder
     linear_map = False
     filter = False
