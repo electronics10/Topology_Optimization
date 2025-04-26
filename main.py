@@ -25,27 +25,29 @@ if __name__ == "__main__":
 
     ## Topology optimization
     # parameters
-    exp = "dual_band"
-    iter = 0
+    exp = "test3_2" # Legacy, not important
+    iter = 25
     alpha = 0.2
-    clean_legacy = True # set "False" for continuation, copy experiment results to global reults folder
+    clean_legacy = False # set "False" for continuation, copy experiment results to global results folder
     linear_map = False
     filter = False
     Adam = True
     print(f"alpha={alpha}, linear_map={linear_map}, filter={filter}, Adam={Adam}")
 
     # set initial antenna topology
-    initial = ad.generate_shape("square")
-    # initial = ad.generate_shape("rectangle") 
-    # initial = initial*0.5
-    initial = initial.ravel()
-    # initial, adam_var, power_init = ad.continue_iteration(exp, iter, alpha, Adam)
-    # optimizer.Adam_var_init = adam_var
-    # optimizer.power_init = power_init
+    if clean_legacy:
+        initial = ad.generate_shape("square")
+        # initial = ad.generate_shape("rectangle") 
+        # initial = initial*0.5
+        initial = initial.ravel()
+    else:
+        initial, adam_var, power_init = ad.continue_iteration(exp, iter, alpha, Adam)
+        optimizer.Adam_var_init = adam_var
+        optimizer.power_init = power_init
 
     # set optimizer and run
     optimizer.iter_init = iter
     optimizer.alpha = alpha
     optimizer.primal_init = initial
     if clean_legacy: optimizer.clean_results()
-    optimizer.gradient_ascent(linear_map=linear_map, filter=filter, Adam=Adam, max_iter=25, symmetric=True)
+    optimizer.gradient_ascent(linear_map=linear_map, filter=filter, Adam=Adam, max_iter=64, symmetric=True)
