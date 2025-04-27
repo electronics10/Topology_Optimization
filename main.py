@@ -25,13 +25,13 @@ if __name__ == "__main__":
 
     ## Topology optimization
     # parameters
-    exp = "test3_2" # Legacy, not important
-    iter = 25
-    alpha = 0.2
-    clean_legacy = False # set "False" for continuation, copy experiment results to global results folder
+    exp = "test3_3" # Legacy, not important
+    iter = 0
+    alpha = 1
+    clean_legacy = True # set "False" for continuation, copy experiment results to global results folder
     linear_map = False
     filter = False
-    Adam = True
+    Adam = False
     print(f"alpha={alpha}, linear_map={linear_map}, filter={filter}, Adam={Adam}")
 
     # set initial antenna topology
