@@ -641,11 +641,11 @@ class Optimizer:
             if Adam: step, adam_var = self.Adam(grad_primal, index, adam_var)
             primal = primal + self.alpha * step
             
-            # Experimental: Dyanmic learning rate (to escape local optima)
-            if index % 4 == 0: self.alpha = 3
-            elif index % 4 == 1: self.alpha = 5
-            elif index % 4 == 2: self.alpha = 7
-            elif index % 4 == 3: self.alpha = 1
+            # # Experimental: Dyanmic learning rate (to escape local optima)
+            # if index % 4 == 0: self.alpha = 3
+            # elif index % 4 == 1: self.alpha = 5
+            # elif index % 4 == 2: self.alpha = 7
+            # elif index % 4 == 3: self.alpha = 1
 
             # Print rms to see overall trend
             print(f"rms_grad_CST = {rms_grad_CST}")
