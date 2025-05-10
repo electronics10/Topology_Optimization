@@ -134,7 +134,7 @@ To evaluate the performance of the optimization, run:
 ```
 python total_power.py
 ```
-This will show a plot of the relative power received at each iteration. If the optimization is working correctly, you should see the power tend to increase as iterations progress, as shown below:
+This will show a plot of the relative power received at each iteration. If the optimization is working correctly, you should see the trend of power absorption increases as iterations progress, as shown below:
 ![Total Power Plot](demo/power.png)
 
 The plot shows the relative power (y-axis) increasing over iterations (x-axis), indicating that the antenna design is improving.
