@@ -36,7 +36,36 @@ if __name__ == "__main__":
 
     # set initial antenna topology
     if clean_legacy:
-        initial = ad.generate_shape("square")
+        half = []
+        
+        H0 = 3
+        H1 = 2
+        # H3 = 8-H0-H1
+        L1 = 10
+        D1 = 3
+        L2 = 2
+        D2 = D1
+        
+        arr1 = [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+        arr2 = []
+        arr3 = []
+        for j in range(16):
+            if j<D1: arr2.append(1)
+            elif j<D1+L1: arr2.append(0)
+            else: arr2.append(1)
+        for j in range(16):
+            if j<D2: arr3.append(1)
+            elif j<D2+L2: arr3.append(0)
+            else: arr3.append(1)
+        
+        for i in range(8):
+            if i < H0: half.append(arr1)
+            elif i < H0 + H1: half.append(arr2)
+            else: half.append(arr3)
+        
+        initial = half + half[::-1]
+        initial = np.array(initial)
+        # initial = ad.generate_shape("square")
         # initial = ad.generate_shape("rectangle") 
         # initial = initial*0.5
         initial = initial.ravel()
