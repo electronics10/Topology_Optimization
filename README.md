@@ -118,7 +118,7 @@ This script will show four images, each representing a different aspect of the o
 - **Conductivity Distribution**: The real conductivity distribution of the antenna topology. This shows the physical layout of the antenna.
   ![Conductivity Distribution](demo/cond.png)
 
-- **Normalized Conductivity**: The conductivity values mapped to the interval [0, 1] and displayed in a log scale for clearer visualization of variations.
+- **Normalized Conductivity**: The conductivity values mapped to the interval [0, 1] for clearer visualization of variations.
   ![Normalized Conductivity](demo/primal.png)
 
 - **Gradient**: The gradient calculated using the adjoint method, showing the sensitivity of the design to changes.
