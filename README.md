@@ -74,7 +74,7 @@ python main.py
 This section provides an example of how to use this repository to optimize an antenna design. Follow the steps below to replicate the results.
 
 ### 1. Understand the Design Domain
-The design region is defined in `Antenna_Design.py`. By default, the design domain is a 48mm x 48mm square, pixelized with each pixel being 3mm x 3mm. Modifying this file is not recommended unless you are confident in what you are doing, as it may affect the optimization process.
+The design region is defined in `Antenna_Design.py`. By default, the design domain is a 48mm x 48mm square, pixelized with 3mm x 3mm sized pixel. Modifying this file is not recommended unless you are confident in what you are doing, as it may affect the optimization process.
 
 ### 2. Configure Input Specifications
 The input specifications for the antenna can be manually altered in `main.py`. Open `main.py` and look for the following lines after the `import` statements:
