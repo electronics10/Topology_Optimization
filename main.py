@@ -31,7 +31,7 @@ if __name__ == "__main__":
     clean_legacy = True # set "False" for continuation, copy experiment results to global results folder
     linear_map = False
     filter = False
-    Adam = True
+    Adam = False
     print(f"alpha={alpha}, linear_map={linear_map}, filter={filter}, Adam={Adam}")
 
     # set initial antenna topology
