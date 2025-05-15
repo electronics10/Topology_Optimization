@@ -1,9 +1,9 @@
 import Antenna_Design as ad
 import numpy as np
 
-AMP = [0.4, 0.6] # weight for different frequency signal
-FREQ = [1.8, 2.7] # GHz
-BW = [0.13, 0.07] # ratio bandwidth
+AMP = [1] # weight for different frequency signal
+FREQ = [1.8] # GHz
+BW = [0.13] # ratio bandwidth
 # AXRR = [0, 0] # axial ratio reciprocal (minor_axis/major_axis)
 
 if __name__ == "__main__":
@@ -25,7 +25,7 @@ if __name__ == "__main__":
 
     ## Topology optimization
     # parameters
-    exp = "u_slot" # Legacy, not important
+    exp = "single" # Legacy, not important
     iter = 0
     alpha = 1
     clean_legacy = True # set "False" for continuation, copy experiment results to global results folder
