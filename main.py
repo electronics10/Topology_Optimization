@@ -25,10 +25,10 @@ if __name__ == "__main__":
 
     ## Topology optimization
     # parameters
-    exp = "single1" # Legacy, not important
-    iter = 1
+    exp = "single2" # Legacy, not important
+    iter = 0
     alpha = 1
-    clean_legacy = False # set "False" for continuation, copy experiment results to global results folder
+    clean_legacy = True # set "False" for continuation, copy experiment results to global results folder
     linear_map = False
     filter = False
     Adam = False
@@ -69,9 +69,9 @@ if __name__ == "__main__":
         
     if clean_legacy:
         # initial = u_slot()
-        initial = ad.generate_shape("square")
-        # initial = ad.generate_shape("rectangle") 
-        initial = initial*0.5
+        # initial = ad.generate_shape("square")
+        initial = ad.generate_shape("rectangle") 
+        # initial = initial*0.5
         initial = initial.ravel()
     else:
         initial, adam_var, power_init = ad.continue_iteration(exp, iter, alpha, Adam)
