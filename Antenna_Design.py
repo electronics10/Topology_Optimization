@@ -1041,7 +1041,7 @@ class Plotter():
         for path in self.results_history_path.values():
             for index in range(batch):
                 self.plot_distribution(path, true_position, start=index/batch, end=(index+1)/batch)
-                plt.show()
+        plt.show()
 
 # Some interesting initial antenna generator
 def generate_shape(shape):
