@@ -19,9 +19,9 @@ import difflib
 
 
 # Design parameter
-L = 48 # mm
-W = 48 # mm
-D = 3 # mm
+L = 36 # mm
+W = 36 # mm
+D = 9 # mm
 NX= int(L//D)
 NY = int(W//D)
 TSTEP = 0.1 # default 0.1 ns for 1~3 GHz
@@ -991,13 +991,13 @@ class Plotter():
                 im = plt.imshow(array_1D[0].reshape(self.nx, self.ny), \
                     origin='upper', norm=colors.CenteredNorm(), cmap= 'coolwarm') #'gray_r', 'copper'
             plt.colorbar(im)
-            plt.title(file_path)
+            plt.title(file_path[8:-12])
         else: # more than one plot (most of the cases)
             cols = ceil(sqrt(num_plots))
             rows = ceil(num_plots / cols)
             # Create figure and subplots
             fig, axes = plt.subplots(rows, cols)
-            fig.suptitle(file_path)
+            fig.suptitle(file_path[8:-12])
             axes = axes.flatten()  # Flatten the axes array for easy iteration
             # 1d to 2d (core)
             print("Creating figures...")
