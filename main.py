@@ -2,7 +2,7 @@ import Antenna_Design as ad
 import numpy as np
 
 AMP = [1] # weight for different frequency signal
-FREQ = [1.5] # GHz
+FREQ = [2.1] # GHz
 BW = [0.1] # ratio bandwidth
 # AXRR = [0, 0] # axial ratio reciprocal (minor_axis/major_axis)
 
@@ -25,9 +25,9 @@ if __name__ == "__main__":
 
     ## Topology optimization
     # parameters
-    exp = "hex5" # Legacy, not important
+    exp = "hex6" # Legacy, not important
     iter = 0
-    alpha = 0.5
+    alpha = 1
     clean_legacy = True # set "False" for continuation, copy experiment results to global results folder
     linear_map = False
     filter = False
