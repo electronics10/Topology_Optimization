@@ -26,9 +26,9 @@ if __name__ == "__main__":
     ## Topology optimization
     # parameters
     exp = "UWB1" # Legacy, not important
-    iter = 0
+    iter = 2
     alpha = 0.5
-    clean_legacy = True # set "False" for continuation, copy experiment results to global results folder
+    clean_legacy = False # set "False" for continuation, copy experiment results to global results folder
     linear_map = False
     filter = False
     Adam = False
