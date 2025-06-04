@@ -3,7 +3,7 @@ import numpy as np
 
 AMP = [1] # weight for different frequency signal
 FREQ = [2.1] # GHz
-BW = [0.1] # ratio bandwidth
+BW = [1] # ratio bandwidth
 # AXRR = [0, 0] # axial ratio reciprocal (minor_axis/major_axis)
 
 if __name__ == "__main__":
@@ -17,7 +17,7 @@ if __name__ == "__main__":
     # excitation_generator.plot_wave_and_spectrum()
     
     ## Initiate optimizer
-    topop = ad.Controller("CST_Antennas/topop_hex.cst")
+    topop = ad.Controller("CST_Antennas/topop.cst")
     topop.delete_results()
     topop.set_time_solver()
     optimizer = ad.Optimizer(topop, topop, set_environment=False)
@@ -25,9 +25,9 @@ if __name__ == "__main__":
 
     ## Topology optimization
     # parameters
-    exp = "hex7" # Legacy, not important
+    exp = "UWB1" # Legacy, not important
     iter = 0
-    alpha = 0.5
+    alpha = 1
     clean_legacy = True # set "False" for continuation, copy experiment results to global results folder
     linear_map = False
     filter = False
