@@ -15,6 +15,7 @@ def plot_s11(path, fig_name):
     plt.ylabel("s11 (dB)")
     plt.title("S11")
     plt.grid()
+    plt.show()
 
 if __name__ == "__main__":
     # Read and round primal
@@ -63,8 +64,8 @@ if __name__ == "__main__":
         transmitter.set_frequency_solver()
         transmitter.start_simulate()
         # Store s11
-        s11 = transmitter.read('1D Results\\S-Parameters\\S1,1')
         path = f'results\\verified_s11_{iter}_{threshold}.csv'
+        s11 = transmitter.read('1D Results\\S-Parameters\\S1,1')
         with open(path, 'a', newline='') as csvfile:
             writer = csv.writer(csvfile)
             for line in s11: # [[freq, s11, 50+j],...]
