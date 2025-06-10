@@ -19,12 +19,9 @@ import difflib
 
 
 # Design parameter
-# L = 36 # mm
-# W = 36 # mm
-# D = 9 # mm
-L = 48 # mm
-W = 48 # mm
-D = 3 # mm
+L = 36 # mm
+W = 36 # mm
+D = 9 # mm
 NX= int(L//D)
 NY = int(W//D)
 TSTEP = 0.1 # default 0.1 ns for 1~3 GHz
@@ -975,6 +972,10 @@ class Plotter():
         print("Plotting distribution history...")
         # txt to array (iterations of distribution)
         array_1D = self.parse_iteration_blocks(file_path)
+        if file_path == self.results_history_path['cond']: title = "Conductivity Distribution"
+        elif file_path == self.results_history_path['primal']: title = "Primal Distribution"
+        elif file_path == self.results_history_path['grad_CST']: title = "Gradient"
+        elif file_path == self.results_history_path['step']: title = "Step"
         num_plots = len(array_1D)
         if start > end:
             print("Error: start > end")
@@ -994,13 +995,13 @@ class Plotter():
                 im = plt.imshow(array_1D[0].reshape(self.nx, self.ny), \
                     origin='upper', norm=colors.CenteredNorm(), cmap= 'coolwarm') #'gray_r', 'copper'
             plt.colorbar(im)
-            plt.title(file_path[8:-12])
+            plt.title(title)
         else: # more than one plot (most of the cases)
             cols = ceil(sqrt(num_plots))
             rows = ceil(num_plots / cols)
             # Create figure and subplots
             fig, axes = plt.subplots(rows, cols)
-            fig.suptitle(file_path[8:-12])
+            fig.suptitle(title)
             axes = axes.flatten()  # Flatten the axes array for easy iteration
             # 1d to 2d (core)
             print("Creating figures...")

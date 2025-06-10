@@ -2,13 +2,24 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 import Antenna_Design as ad
+import csv
+import pandas as pd
 
+def plot_s11(path, fig_name):
+    plt.figure(fig_name)
+    df = pd.read_csv(path)  # Assuming headers are present in CSV
+    frequency = df.iloc[:, 0]
+    s11 = df.iloc[:, 1]
+    plt.plot(frequency, s11)
+    plt.xlabel("Frequency (GHz)")
+    plt.ylabel("s11 (dB)")
+    plt.title("S11")
+    plt.grid()
 
 if __name__ == "__main__":
     # Read and round primal
-    iter = input("iteration: ")
+    iter = int(input("iteration: "))
     threshold = float(input("threshold: "))
-    iter = int(iter)
     filePath = f"results/primal_history.txt"
     with open(filePath, 'r') as file:
         record = False
@@ -34,14 +45,16 @@ if __name__ == "__main__":
     cond = string*5.8e7
 
     # Plot test case
+    plt.figure("verified_topology")
     im = plt.imshow(cond.reshape(ad.NX, ad.NY),origin='upper',norm=colors.CenteredNorm(),cmap='coolwarm')
     plt.colorbar(im)
+    plt.title("Antenna Topology")
     plt.show()
 
     # Set verification
     flag = input("Continue (y/n)? ")
     if flag == 'y':
-        transmitter = ad.Controller("CST_Antennas/topop.cst")
+        transmitter = ad.Controller("CST_Antennas/topop_hex.cst")
         transmitter.delete_results()
         try: transmitter.delete_signal1()
         except: pass
@@ -49,4 +62,17 @@ if __name__ == "__main__":
         transmitter.set_port(transmitter.port[0], transmitter.port[1])
         transmitter.set_frequency_solver()
         transmitter.start_simulate()
+        # Store s11
+        s11 = transmitter.read('1D Results\\S-Parameters\\S1,1')
+        path = f'results\\verified_s11_{iter}_{threshold}.csv'
+        with open(path, 'a', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            for line in s11: # [[freq, s11, 50+j],...]
+                line = np.abs(line) # change s11 from complex to absolute
+                line[1] = 20*np.log10(line[1]) # convert to dB
+                writer.writerow(line[:-1])
+        # Plot S11
+        plot_s11(path, f"S11_{iter}_{threshold}")
     else: pass
+
+    

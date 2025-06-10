@@ -19,7 +19,7 @@ if __name__ == '__main__':
     x = np.arange(len(data))
     plt.plot(x, data, marker='o')
     plt.grid()
-    plt.title("Total Power")
+    plt.title("Received Power at Feed")
     plt.xlabel("Iterations")
     plt.ylabel("Relative Power")
     plt.show()

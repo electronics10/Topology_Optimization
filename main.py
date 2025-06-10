@@ -2,8 +2,8 @@ import Antenna_Design as ad
 import numpy as np
 
 AMP = [1] # weight for different frequency signal
-FREQ = [2.1] # GHz
-BW = [1] # ratio bandwidth
+FREQ = [1.5] # GHz
+BW = [0.1] # ratio bandwidth
 # AXRR = [0, 0] # axial ratio reciprocal (minor_axis/major_axis)
 
 if __name__ == "__main__":
@@ -17,7 +17,7 @@ if __name__ == "__main__":
     # excitation_generator.plot_wave_and_spectrum()
     
     ## Initiate optimizer
-    topop = ad.Controller("CST_Antennas/topop.cst")
+    topop = ad.Controller("CST_Antennas/topop_hex.cst")
     topop.delete_results()
     topop.set_time_solver()
     optimizer = ad.Optimizer(topop, topop, set_environment=False)
@@ -25,13 +25,13 @@ if __name__ == "__main__":
 
     ## Topology optimization
     # parameters
-    exp = "UWB1" # Legacy, not important
-    iter = 2
-    alpha = 0.5
-    clean_legacy = False # set "False" for continuation, copy experiment results to global results folder
-    linear_map = False
+    exp = "hex1.2" # Legacy, not important
+    iter = 0
+    alpha = 0.1
+    clean_legacy = True # set "False" for continuation, copy experiment results to global results folder
+    linear_map = True
     filter = False
-    Adam = False
+    Adam = True
     print(f"alpha={alpha}, linear_map={linear_map}, filter={filter}, Adam={Adam}")
 
     # set initial antenna topology
@@ -69,9 +69,9 @@ if __name__ == "__main__":
         
     if clean_legacy:
         # initial = u_slot()
-        initial = ad.generate_shape("square")
-        # initial = ad.generate_shape("rectangle") 
-        initial = initial*0.5
+        # initial = ad.generate_shape("square")
+        initial = ad.generate_shape("rectangle") 
+        # initial = initial*0.5
         initial = initial.ravel()
     else:
         initial, adam_var, power_init = ad.continue_iteration(exp, iter, alpha, Adam)
