@@ -27,7 +27,7 @@ if __name__ == "__main__":
     # parameters
     exp = "hex2.2" # Legacy, not important
     iter = 0
-    alpha = 0.1
+    alpha = 0.5
     clean_legacy = True # set "False" for continuation, copy experiment results to global results folder
     linear_map = True
     filter = False
@@ -69,8 +69,8 @@ if __name__ == "__main__":
         
     if clean_legacy:
         # initial = u_slot()
-        initial = ad.generate_shape("square")
-        # initial = ad.generate_shape("rectangle") 
+        # initial = ad.generate_shape("square")
+        initial = ad.generate_shape("rectangle") 
         # initial = initial*0.5
         initial = initial.ravel()
     else:
