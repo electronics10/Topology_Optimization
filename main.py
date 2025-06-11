@@ -25,9 +25,9 @@ if __name__ == "__main__":
 
     ## Topology optimization
     # parameters
-    exp = "hex2.4" # Legacy, not important
+    exp = "hex2.5" # Legacy, not important
     iter = 0
-    alpha = 0.5
+    alpha = 0.1
     clean_legacy = True # set "False" for continuation, copy experiment results to global results folder
     linear_map = True
     filter = False
