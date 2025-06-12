@@ -20,14 +20,14 @@ if __name__ == "__main__":
     topop = ad.Controller("CST_Antennas/topop_18.cst")
     topop.delete_results()
     topop.set_time_solver()
-    optimizer = ad.Optimizer(topop, topop, set_environment=True)
+    optimizer = ad.Optimizer(topop, topop, set_environment=False)
     optimizer.specification(excitation_generator.spec_dic, set_monitor=True)
 
     ## Topology optimization
     # parameters
     exp = "hex3.1" # Legacy, not important
     iter = 0
-    alpha = 0.1
+    alpha = 0.5
     clean_legacy = True # set "False" for continuation, copy experiment results to global results folder
     linear_map = True
     filter = False
