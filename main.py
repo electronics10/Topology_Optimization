@@ -17,10 +17,10 @@ if __name__ == "__main__":
     # excitation_generator.plot_wave_and_spectrum()
     
     ## Initiate optimizer
-    topop = ad.Controller("CST_Antennas/topop_hex.cst")
+    topop = ad.Controller("CST_Antennas/topop_18.cst")
     topop.delete_results()
     topop.set_time_solver()
-    optimizer = ad.Optimizer(topop, topop, set_environment=False)
+    optimizer = ad.Optimizer(topop, topop, set_environment=True)
     optimizer.specification(excitation_generator.spec_dic, set_monitor=True)
 
     ## Topology optimization
