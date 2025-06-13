@@ -27,7 +27,7 @@ if __name__ == "__main__":
     # parameters
     exp = "fine_2" # Legacy, not important
     iter = 0
-    alpha = 0.5
+    alpha = 0.3
     clean_legacy = True # set "False" for continuation, copy experiment results to global results folder
     linear_map = False
     filter = False
