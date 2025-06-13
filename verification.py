@@ -55,7 +55,7 @@ if __name__ == "__main__":
     # Set verification
     flag = input("Continue (y/n)? ")
     if flag == 'y':
-        transmitter = ad.Controller("CST_Antennas/topop_hex.cst")
+        transmitter = ad.Controller("CST_Antennas/topop_18.cst")
         transmitter.delete_results()
         try: transmitter.delete_signal1()
         except: pass
