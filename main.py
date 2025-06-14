@@ -25,9 +25,9 @@ if __name__ == "__main__":
 
     ## Topology optimization
     # parameters
-    exp = "fine_2" # Legacy, not important
+    exp = "fine_3" # Legacy, not important
     iter = 0
-    alpha = 0.3
+    alpha = 1
     clean_legacy = True # set "False" for continuation, copy experiment results to global results folder
     linear_map = False
     filter = False
