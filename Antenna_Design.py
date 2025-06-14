@@ -974,7 +974,7 @@ class Plotter():
         # txt to array (iterations of distribution)
         array_1D = self.parse_iteration_blocks(file_path)
         if file_path == self.results_history_path['cond']: title = "Conductivity Distribution"
-        elif file_path == self.results_history_path['primal']: title = "Primal Distribution"
+        elif file_path == self.results_history_path['primal']: title = "Distribution"
         elif file_path == self.results_history_path['grad_CST']: title = "Gradient"
         elif file_path == self.results_history_path['step']: title = "Step"
         num_plots = len(array_1D)
