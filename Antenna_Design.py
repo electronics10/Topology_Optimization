@@ -582,7 +582,8 @@ class Optimizer:
                 cond = primal*5.8e7
             else: # log
                 primal = np.clip(primal, 0, 1)
-                cond = 10**(7.76 * primal) - 1
+                # cond = 10**(7.76 * primal) - 1
+                cond = 10**(7.76 * primal)
             # else: # sigmoid
             #     if index == 0: primal = 50 * (primal - 0.5*ones) # since default generation is binary but we don't want [0,1] interval
             #     primal = np.clip(primal, -25, 25) # otherwise inf, or nan raised (e^21 ~= 1.3e9)
