@@ -20,7 +20,7 @@ if __name__ == '__main__':
     plt.plot(x, data, marker='o')
     # plt.grid()
     plt.ylim(0, 1.1)
-    x_max = 7
+    x_max = 15
     plt.xlim(0, x_max+0.2)
     plt.xticks(np.arange(0, x_max+1, 1))
     plt.title("Relative Received Power at Feed")
