@@ -12,7 +12,7 @@ def plot_s11(path, fig_name):
     s11 = df.iloc[:, 1]
     plt.plot(frequency, s11)
     plt.xlabel("Frequency (GHz)")
-    plt.ylabel("s11 (dB)")
+    plt.ylabel("|S11| (dB)")
     plt.title("S11")
     # plt.grid()
     plt.show()
