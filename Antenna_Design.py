@@ -21,7 +21,7 @@ import difflib
 # Design parameter
 L = 36 # mm
 W = 36 # mm
-D = 2 # mm
+D = 9 # mm
 NX= int(L//D)
 NY = int(W//D)
 TSTEP = 0.1 # default 0.1 ns for 1~3 GHz
