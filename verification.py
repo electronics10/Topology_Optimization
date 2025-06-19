@@ -14,10 +14,10 @@ def plot_s11(path, fig_name):
     plt.xlabel("Frequency (GHz)")
     plt.ylabel("s11 (dB)")
     plt.title("S11")
-    plt.grid()
+    # plt.grid()
     plt.show()
 
-if __name__ == "__main__":
+def run_CST()
     # Read and round primal
     iter = int(input("iteration: "))
     threshold = float(input("threshold: "))
@@ -72,8 +72,10 @@ if __name__ == "__main__":
                 line = np.abs(line) # change s11 from complex to absolute
                 line[1] = 20*np.log10(line[1]) # convert to dB
                 writer.writerow(line[:-1])
-        # Plot S11
-        plot_s11(path, f"S11_{iter}_{threshold}")
-    else: pass
+
+if __name__ == "__main__":
+    run_CST()
+    plot = input("Plot S11 (y/n)? ")
+    if plot: plot_s11(path, f"S11_{iter}_{threshold}")
 
     
