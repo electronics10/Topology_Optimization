@@ -19,6 +19,10 @@ if __name__ == '__main__':
     x = np.arange(len(data))
     plt.plot(x, data, marker='o')
     # plt.grid()
+    plt.ylim(0, 1.1)
+    x_max = 7
+    plt.xlim(0, x_max)
+    plt.xticks(np.arange(0, x_max+1, 1))
     plt.title("Received Power at Feed")
     plt.xlabel("Iterations")
     plt.ylabel("Relative Power")
