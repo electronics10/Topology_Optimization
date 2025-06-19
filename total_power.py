@@ -21,7 +21,7 @@ if __name__ == '__main__':
     # plt.grid()
     plt.ylim(0, 1.1)
     x_max = 7
-    plt.xlim(0, x_max)
+    plt.xlim(0, x_max+0.2)
     plt.xticks(np.arange(0, x_max+1, 1))
     plt.title("Relative Received Power at Feed")
     plt.xlabel("Number of Iterations")
