@@ -55,7 +55,7 @@ def run_CST():
     # Set verification
     path = f'results\\verified_s11_{iter}_{threshold}.csv'
     fig_name = f"S11_{iter}_{threshold}"
-    flag = input("Continue (y/n)? ")
+    flag = input("Run CST and store S11 (y/n)? ")
     if flag == 'y':
         transmitter = ad.Controller("CST_Antennas/topop_18.cst")
         transmitter.delete_results()
