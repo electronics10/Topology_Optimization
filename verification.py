@@ -53,6 +53,8 @@ def run_CST():
     plt.show()
 
     # Set verification
+    path = f'results\\verified_s11_{iter}_{threshold}.csv'
+    fig_name = f"S11_{iter}_{threshold}"
     flag = input("Continue (y/n)? ")
     if flag == 'y':
         transmitter = ad.Controller("CST_Antennas/topop_18.cst")
@@ -64,7 +66,6 @@ def run_CST():
         transmitter.set_frequency_solver()
         transmitter.start_simulate()
         # Store s11
-        path = f'results\\verified_s11_{iter}_{threshold}.csv'
         s11 = transmitter.read('1D Results\\S-Parameters\\S1,1')
         with open(path, 'a', newline='') as csvfile:
             writer = csv.writer(csvfile)
@@ -72,7 +73,7 @@ def run_CST():
                 line = np.abs(line) # change s11 from complex to absolute
                 line[1] = 20*np.log10(line[1]) # convert to dB
                 writer.writerow(line[:-1])
-    return path, f"S11_{iter}_{threshold}"
+    return path, fig_name
 
 if __name__ == "__main__":
     path, fig_name = run_CST()
