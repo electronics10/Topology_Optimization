@@ -17,7 +17,7 @@ def plot_s11(path, fig_name):
     # plt.grid()
     plt.show()
 
-def run_CST()
+def run_CST():
     # Read and round primal
     iter = int(input("iteration: "))
     threshold = float(input("threshold: "))
