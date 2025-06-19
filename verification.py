@@ -72,10 +72,11 @@ def run_CST():
                 line = np.abs(line) # change s11 from complex to absolute
                 line[1] = 20*np.log10(line[1]) # convert to dB
                 writer.writerow(line[:-1])
+    return path, f"S11_{iter}_{threshold}"
 
 if __name__ == "__main__":
-    run_CST()
+    path, fig_name = run_CST()
     plot = input("Plot S11 (y/n)? ")
-    if plot: plot_s11(path, f"S11_{iter}_{threshold}")
+    if plot: plot_s11(path, fig_name)
 
     
