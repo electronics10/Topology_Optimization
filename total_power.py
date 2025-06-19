@@ -17,7 +17,7 @@ def data_dict():
 if __name__ == '__main__':
     data = data_dict()
     x = np.arange(len(data))
-    plt.plot(x, data, marker='v')
+    plt.plot(x, data, marker='D')
     # plt.grid()
     plt.ylim(0, 1.1)
     x_max = 7
