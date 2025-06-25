@@ -1,11 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
-import Antenna_Design as ad
 import csv
 import pandas as pd
 from matplotlib import cm
 from matplotlib.colors import LinearSegmentedColormap
+from settings import*
 
 # Get the original 'coolwarm' colormap
 coolwarm_cmap = cm.get_cmap('coolwarm')
@@ -59,7 +59,7 @@ def run_CST():
 
     # Plot test case
     plt.figure("verified_topology")
-    im = plt.imshow(cond.reshape(ad.NX, ad.NY),origin='upper',norm=colors.CenteredNorm(),cmap='coolwarm')
+    im = plt.imshow(cond.reshape(ad.NX, ad.NY),origin='upper, cmap=half_coolwarm_cmap)
     plt.colorbar(im)
     plt.title("Antenna Topology")
     plt.show()
