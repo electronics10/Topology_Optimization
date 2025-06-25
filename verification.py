@@ -12,10 +12,10 @@ coolwarm_cmap = cm.get_cmap('coolwarm')
 
 # Create a list of colors from the first half (0 to 0.5) of 'coolwarm'
 # We'll sample 256 colors for a smooth transition
-colors = [coolwarm_cmap(i) for i in np.linspace(0.5, 1, 256)]
+color = [coolwarm_cmap(i) for i in np.linspace(0.5, 1, 256)]
 
 # Create a new colormap from this list of colors
-half_coolwarm_cmap = LinearSegmentedColormap.from_list("half_coolwarm", colors)
+half_coolwarm_cmap = LinearSegmentedColormap.from_list("half_coolwarm", color)
 
 def plot_s11(path, fig_name):
     plt.figure(fig_name)
@@ -59,16 +59,20 @@ def run_CST():
 
     # Plot test case
     plt.figure("verified_topology")
-    im = plt.imshow(cond.reshape(ad.NX, ad.NY),origin='upper', cmap=half_coolwarm_cmap)
+    mid = (L/2, W/2)
+    im = plt.imshow(cond.reshape(NX, NY),origin='upper', \
+                    extent=[-mid[0], L-mid[0], -mid[1], W-mid[1]],\
+                    cmap=half_coolwarm_cmap)
     plt.colorbar(im)
     plt.title("Antenna Topology")
     plt.show()
 
     # Set verification
-    path = f'results\\verified_s11_{iter}_{threshold}.csv'
+    path = f'results/verified_s11_{iter}_{threshold}.csv'
     fig_name = f"S11_{iter}_{threshold}"
     flag = input("Run CST and store S11 (y/n)? ")
     if flag == 'y':
+        import Antenna_Design as ad
         transmitter = ad.Controller("CST_Antennas/topop_18.cst")
         transmitter.delete_results()
         try: transmitter.delete_signal1()
@@ -90,6 +94,4 @@ def run_CST():
 if __name__ == "__main__":
     path, fig_name = run_CST()
     plot = input("Plot S11 (y/n)? ")
-    if plot: plot_s11(path, fig_name)
-
-    
+    if plot == 'y': plot_s11(path, fig_name)
