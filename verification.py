@@ -4,6 +4,18 @@ import matplotlib.colors as colors
 import Antenna_Design as ad
 import csv
 import pandas as pd
+from matplotlib import cm
+from matplotlib.colors import LinearSegmentedColormap
+
+# Get the original 'coolwarm' colormap
+coolwarm_cmap = cm.get_cmap('coolwarm')
+
+# Create a list of colors from the first half (0 to 0.5) of 'coolwarm'
+# We'll sample 256 colors for a smooth transition
+colors = [coolwarm_cmap(i) for i in np.linspace(0.5, 1, 256)]
+
+# Create a new colormap from this list of colors
+half_coolwarm_cmap = LinearSegmentedColormap.from_list("half_coolwarm", colors)
 
 def plot_s11(path, fig_name):
     plt.figure(fig_name)
