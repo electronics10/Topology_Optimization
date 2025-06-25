@@ -53,10 +53,10 @@ class Plotter():
                 mid = (self.Ld/2, self.Wd/2)
                 im = plt.imshow(array_1D[0].reshape(self.nx, self.ny), \
                                         extent=[-mid[0], self.Ld-mid[0], -mid[1], self.Wd-mid[1]], \
-                                        norm=colors.CenteredNorm(), cmap='coolwarm')
+                                        cmap='coolwarm')
             else:
                 im = plt.imshow(array_1D[0].reshape(self.nx, self.ny), \
-                    origin='upper', norm=colors.CenteredNorm(), cmap= 'coolwarm') #'gray_r', 'copper'
+                    origin='upper', cmap= 'coolwarm')
             plt.colorbar(im)
             plt.title(title)
         else: # more than one plot (most of the cases)
@@ -73,12 +73,12 @@ class Plotter():
                 for index, distribution_1D in enumerate(array_1D):
                     im = axes[index].imshow(distribution_1D.reshape(self.nx, self.ny), \
                                             extent=[-mid[0], self.Ld-mid[0], -mid[1], self.Wd-mid[1]], \
-                                            norm=colors.CenteredNorm(), cmap='coolwarm')
+                                            cmap='coolwarm')
                     # axes[index].set_title(f'Iteration {index}')
             else:
                 for index, distribution_1D in enumerate(array_1D):
                     im = axes[index].imshow(distribution_1D.reshape(self.nx, self.ny), \
-                        origin='upper', norm=colors.CenteredNorm(), cmap= 'coolwarm') #'gray_r', 'copper'
+                        origin='upper', cmap= 'coolwarm')
                     axes[index].axis('off') # 'off' Hide axis for better visualization
             fig.colorbar(im, ax = axes[-1], fraction=0.1)
             # Remove any empty subplots
