@@ -4,6 +4,7 @@ import matplotlib.colors as colors
 from math import ceil, sqrt
 from matplotlib import cm
 from matplotlib.colors import LinearSegmentedColormap
+from settings import*
 
 # Get the original 'coolwarm' colormap
 coolwarm_cmap = cm.get_cmap('coolwarm')
