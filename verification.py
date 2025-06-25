@@ -59,7 +59,7 @@ def run_CST():
 
     # Plot test case
     plt.figure("verified_topology")
-    im = plt.imshow(cond.reshape(ad.NX, ad.NY),origin='upper, cmap=half_coolwarm_cmap)
+    im = plt.imshow(cond.reshape(ad.NX, ad.NY),origin='upper', cmap=half_coolwarm_cmap)
     plt.colorbar(im)
     plt.title("Antenna Topology")
     plt.show()
