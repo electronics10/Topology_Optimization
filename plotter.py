@@ -11,10 +11,10 @@ coolwarm_cmap = cm.get_cmap('coolwarm')
 
 # Create a list of colors from the first half (0 to 0.5) of 'coolwarm'
 # We'll sample 256 colors for a smooth transition
-colors = [coolwarm_cmap(i) for i in np.linspace(0.5, 1, 256)]
+color = [coolwarm_cmap(i) for i in np.linspace(0.5, 1, 256)]
 
 # Create a new colormap from this list of colors
-half_coolwarm_cmap = LinearSegmentedColormap.from_list("half_coolwarm", colors)
+half_coolwarm_cmap = LinearSegmentedColormap.from_list("half_coolwarm", color)
 
 # results plotting functions
 class Plotter():
@@ -25,20 +25,16 @@ class Plotter():
         self.nx = NX
         self.ny = NY
         self.results_history_path = {
-            'cond':"results\\cond_smoothed_history.txt", 
-            'primal':"results\\primal_history.txt",
-            'grad_CST':"results\\grad_CST_history.txt",
-            'step':"results\\step_history.txt"
+            'cond':"results/cond_smoothed_history.txt", 
+            'primal':"results/primal_history.txt",
+            'grad_CST':"results/grad_CST_history.txt",
+            'step':"results/step_history.txt"
             }
         
     def plot_distribution(self, file_path, true_position=True, start=0, end=1):
         print("Plotting distribution history...")
         # txt to array (iterations of distribution)
         array_1D = self.parse_iteration_blocks(file_path)
-        if file_path == self.results_history_path['cond']: title = "Conductivity Distribution"
-        elif file_path == self.results_history_path['primal']: title = "Distribution"
-        elif file_path == self.results_history_path['grad_CST']: title = "Gradient"
-        elif file_path == self.results_history_path['step']: title = "Step"
         num_plots = len(array_1D)
         if start > end:
             print("Error: start > end")
@@ -51,12 +47,39 @@ class Plotter():
         if num_plots == 1:
             if true_position:
                 mid = (self.Ld/2, self.Wd/2)
-                im = plt.imshow(array_1D[0].reshape(self.nx, self.ny), \
+                if file_path == self.results_history_path['cond']: 
+                    title = "Conductivity Distribution"
+                    im = plt.imshow(array_1D[0].reshape(self.nx, self.ny), \
+                                        extent=[-mid[0], self.Ld-mid[0], -mid[1], self.Wd-mid[1]], \
+                                        cmap=half_coolwarm_cmap)
+                elif file_path == self.results_history_path['primal']: 
+                    title = "Distribution"
+                    im = plt.imshow(array_1D[0].reshape(self.nx, self.ny), \
+                                        extent=[-mid[0], self.Ld-mid[0], -mid[1], self.Wd-mid[1]], \
+                                        cmap=half_coolwarm_cmap, vmin=0, vmax=1)
+                elif file_path == self.results_history_path['grad_CST']: 
+                    title = "Gradient"
+                    im = plt.imshow(array_1D[0].reshape(self.nx, self.ny), \
                                         extent=[-mid[0], self.Ld-mid[0], -mid[1], self.Wd-mid[1]], \
                                         cmap='coolwarm')
+                elif file_path == self.results_history_path['step']: 
+                    title = "Step"
+                    im = plt.imshow(array_1D[0].reshape(self.nx, self.ny), \
+                                        extent=[-mid[0], self.Ld-mid[0], -mid[1], self.Wd-mid[1]], \
+                                        cmap='coolwarm', vmin=-1, vmax=1)
             else:
-                im = plt.imshow(array_1D[0].reshape(self.nx, self.ny), \
-                    origin='upper', cmap= 'coolwarm')
+                if file_path == self.results_history_path['cond']: 
+                    title = "Conductivity Distribution"
+                    im = plt.imshow(array_1D[0].reshape(self.nx, self.ny), cmap=half_coolwarm_cmap)
+                elif file_path == self.results_history_path['primal']: 
+                    title = "Distribution"
+                    im = plt.imshow(array_1D[0].reshape(self.nx, self.ny), cmap=half_coolwarm_cmap, vmin=0, vmax=1)
+                elif file_path == self.results_history_path['grad_CST']: 
+                    title = "Gradient"
+                    im = plt.imshow(array_1D[0].reshape(self.nx, self.ny), cmap='coolwarm')
+                elif file_path == self.results_history_path['step']: 
+                    title = "Step"
+                    im = plt.imshow(array_1D[0].reshape(self.nx, self.ny), cmap='coolwarm', vmin=-1, vmax=1)
             plt.colorbar(im)
             plt.title(title)
         else: # more than one plot (most of the cases)
@@ -64,23 +87,63 @@ class Plotter():
             rows = ceil(num_plots / cols)
             # Create figure and subplots
             fig, axes = plt.subplots(rows, cols)
-            fig.suptitle(title)
             axes = axes.flatten()  # Flatten the axes array for easy iteration
             # 1d to 2d (core)
             print("Creating figures...")
             if true_position:
                 mid = (self.Ld/2, self.Wd/2)
-                for index, distribution_1D in enumerate(array_1D):
-                    im = axes[index].imshow(distribution_1D.reshape(self.nx, self.ny), \
-                                            extent=[-mid[0], self.Ld-mid[0], -mid[1], self.Wd-mid[1]], \
-                                            cmap='coolwarm')
-                    # axes[index].set_title(f'Iteration {index}')
+                if file_path == self.results_history_path['cond']: 
+                    title = "Conductivity Distribution"
+                    for index, distribution_1D in enumerate(array_1D):
+                        im = axes[index].imshow(distribution_1D.reshape(self.nx, self.ny), \
+                                                extent=[-mid[0], self.Ld-mid[0], -mid[1], self.Wd-mid[1]], \
+                                                cmap=half_coolwarm_cmap)
+                elif file_path == self.results_history_path['primal']: 
+                    title = "Distribution"
+                    for index, distribution_1D in enumerate(array_1D):
+                        im = axes[index].imshow(distribution_1D.reshape(self.nx, self.ny), \
+                                                extent=[-mid[0], self.Ld-mid[0], -mid[1], self.Wd-mid[1]], \
+                                                cmap=half_coolwarm_cmap, vmin=0, vmax=1)
+                elif file_path == self.results_history_path['grad_CST']: 
+                    title = "Gradient"
+                    for index, distribution_1D in enumerate(array_1D):
+                        im = axes[index].imshow(distribution_1D.reshape(self.nx, self.ny), \
+                                                extent=[-mid[0], self.Ld-mid[0], -mid[1], self.Wd-mid[1]], \
+                                                cmap='coolwarm')
+                elif file_path == self.results_history_path['step']: 
+                    title = "Step"
+                    for index, distribution_1D in enumerate(array_1D):
+                        im = axes[index].imshow(distribution_1D.reshape(self.nx, self.ny), \
+                                                extent=[-mid[0], self.Ld-mid[0], -mid[1], self.Wd-mid[1]], \
+                                                cmap='coolwarm', vmin=-1, vmax=1)
             else:
-                for index, distribution_1D in enumerate(array_1D):
-                    im = axes[index].imshow(distribution_1D.reshape(self.nx, self.ny), \
-                        origin='upper', cmap= 'coolwarm')
-                    axes[index].axis('off') # 'off' Hide axis for better visualization
+                if file_path == self.results_history_path['cond']: 
+                    title = "Conductivity Distribution"
+                    for index, distribution_1D in enumerate(array_1D):
+                        im = axes[index].imshow(distribution_1D.reshape(self.nx, self.ny), \
+                            origin='upper', cmap= half_coolwarm_cmap)
+                        axes[index].axis('off') # 'off' Hide axis for better visualization
+                elif file_path == self.results_history_path['primal']: 
+                    title = "Distribution"
+                    for index, distribution_1D in enumerate(array_1D):
+                        im = axes[index].imshow(distribution_1D.reshape(self.nx, self.ny), \
+                            origin='upper', cmap= half_coolwarm_cmap, vmin=0, vmax=1)
+                        axes[index].axis('off') # 'off' Hide axis for better visualization
+                elif file_path == self.results_history_path['grad_CST']: 
+                    title = "Gradient"
+                    for index, distribution_1D in enumerate(array_1D):
+                        im = axes[index].imshow(distribution_1D.reshape(self.nx, self.ny), \
+                            origin='upper', cmap= 'coolwarm', norm=colors.CenteredNorm())
+                        axes[index].axis('off') # 'off' Hide axis for better visualization
+                elif file_path == self.results_history_path['step']: 
+                    title = "Step"
+                    for index, distribution_1D in enumerate(array_1D):
+                        im = axes[index].imshow(distribution_1D.reshape(self.nx, self.ny), \
+                            origin='upper', cmap= 'coolwarm', vmin=-1, vmax=1)
+                        axes[index].axis('off') # 'off' Hide axis for better visualization
+                axes[index].axis('off') # 'off' Hide axis for better visualization
             fig.colorbar(im, ax = axes[-1], fraction=0.1)
+            fig.suptitle(title)
             # Remove any empty subplots
             for j in range(index + 1, len(axes)):
                 fig.delaxes(axes[j])
